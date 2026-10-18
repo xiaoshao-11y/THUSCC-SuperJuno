@@ -1,0 +1,16 @@
+raw/
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/
+
+# Legacy output locations used before the repository layout was normalized.
+PE/
+sparsify/
+tvE/
+tvE_double/
+
+# External inputs and generated artifacts stay out of Git.
+data
+output

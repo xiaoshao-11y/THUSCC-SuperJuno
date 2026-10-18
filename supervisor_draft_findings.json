@@ -1,0 +1,38 @@
+{
+  "numpy": "2.4.6",
+  "fixture": "four 64-bit structured EventID/channel pairs; original function extracted from immutable upstream git HEAD",
+  "checks": [
+    {
+      "array": "istar",
+      "bitwise_equal": false,
+      "first_mismatch_index": [
+        0,
+        1
+      ]
+    },
+    {
+      "array": "erandom",
+      "bitwise_equal": false,
+      "first_mismatch_index": [
+        0,
+        1
+      ]
+    },
+    {
+      "array": "wanders",
+      "bitwise_equal": false,
+      "first_mismatch_index": [
+        0,
+        1
+      ]
+    },
+    {
+      "array": "accepts",
+      "bitwise_equal": false,
+      "first_mismatch_index": [
+        0,
+        1
+      ]
+    }
+  ]
+}

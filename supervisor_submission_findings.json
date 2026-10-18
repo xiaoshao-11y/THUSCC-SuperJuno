@@ -1,0 +1,8 @@
+{
+  "case": "clean_first_submission",
+  "exit_code": 1,
+  "expected_exit": 0,
+  "stdout": "",
+  "stderr": "",
+  "fixture": "local stub sbatch only; no cluster job submitted"
+}

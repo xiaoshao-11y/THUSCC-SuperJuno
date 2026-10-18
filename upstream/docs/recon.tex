@@ -1,0 +1,982 @@
+\documentclass[UTF8,a4paper,11pt]{ctexart}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{array,booktabs,longtable}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+
+\setcounter{secnumdepth}{0}
+\setcounter{tocdepth}{2}
+\setlength{\emergencystretch}{3em}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+\title{JUNO: 从 PMT 波形到粒子事例重建}
+\author{}
+\date{}
+
+\begin{document}
+\pagestyle{plain}
+\maketitle
+\tableofcontents
+
+\section{一、物理背景}
+
+\subsection{JUNO 的物理目标与逆贝塔衰变探测}
+
+江门地下中微子观测站（Jiangmen Underground Neutrino Observatory，JUNO）
+是一座以约二万吨液体闪烁体为靶体的多用途地下中微子实验。反应堆电子反中微子
+主要通过逆贝塔衰变（inverse beta decay，IBD）进行探测
+
+\[
+\bar\nu_e+p\longrightarrow e^++n.
+\]
+
+正电子沉积动能并与电子湮灭，形成由两个 \(511\ \mathrm{keV}\) 光子参与的
+瞬发（prompt）信号。其可见能量近似满足
+
+\[
+E_{\mathrm{prompt}}\simeq E_{\bar\nu_e}-0.78\ \mathrm{MeV}.
+\]
+
+中子经过热化后主要被氢俘获，并通过约 \(2.2\ \mathrm{MeV}\) 的 \(\gamma\)
+射线形成延迟（delayed）信号。瞬发与延迟信号的时间和空间符合构成 IBD 鉴别的
+重要依据。反应堆反中微子能谱中的精细振荡
+结构承载中微子质量顺序信息，因此能量尺度、能量分辨率与空间响应均直接影响
+物理灵敏度。顶点和事例时间还服务于有效体积定义、外部本底抑制和事例间关联
+\cite{juno2022,huang2023joint}。
+
+JUNO 中心探测器采用直径 \(35.4\ \mathrm{m}\) 的球形丙烯酸容器盛装液体闪烁体，
+外围配置 17,612 只 20 英寸光电倍增管（photomultiplier tube，PMT）和 25,600 只
+3 英寸 PMT。设计研究给出的光电子
+（photoelectron，PE）产额约为 \(1345\ \mathrm{output/PE/MeV}\)。能量实际分辨率由光电子计数涨落、闪烁淬灭、
+切伦科夫光、位置非均匀性、暗噪声率、波形重建和单光电子响应等等共同决定
+\cite{juno2025resolution}。
+
+\subsection{液体闪烁体的发光与光传播}
+
+JUNO 液体闪烁体以线性烷基苯（linear alkylbenzene，LAB）为溶剂，并加入
+PPO 荧光剂和 bis-MSB 波长转换剂。带电粒子的能量沉积引起介质分子的电离与
+激发。能量转移和退激过程产生占主导的闪烁光，满足切伦科夫阈值的带电粒子还会
+产生时间特征更快的切伦科夫光。电离淬灭使闪烁光产额对沉积能量呈非线性响应，
+不同粒子类型由此表现出不同的可见能量尺度。
+
+光子从产生位置传播至 PMT 的过程中经历几何扩散、吸收与再发射、瑞利散射、
+折射、全反射和边界损失。LAB、PPO 与 bis-MSB 之间的竞争吸收和波长转换共同
+改变光子的波长、传播路径及到达时间。上述过程使光收集效率和时间响应具有显著
+的位置依赖性，需要采用空间相关的响应描述
+\cite{dou2023probe,zhang2020optics}。
+
+对于由顶点 \(m\) 产生并最终在通道 \(j\) 形成光电子的光子，观测时间可表示为
+
+\[
+t_{jk}=t_{0m}+\tau_{\mathrm{em}}
+       +\tau_{\mathrm{prop}}(\mathbf r_m,\mathbf p_j)
+       +\tau_{\mathrm{TTS},j}+\Delta t_j.
+\]
+
+这里，\(t_{0m}\) 表示能量沉积时刻，\(\tau_{\mathrm{em}}\) 表示液体闪烁体的
+发光延迟，\(\tau_{\mathrm{prop}}\) 表示光子输运时间，\(\tau_{\mathrm{TTS},j}\)
+表示 PMT 渡越时间随机偏移，其分布宽度由渡越时间展宽
+（transit-time spread，TTS）表征。\(\Delta t_j\) 表示通道时间偏移。前三个
+延迟项均具有随机分布。光子探测效率（photon detection efficiency，PDE）给出入射光子转化
+为光电子的概率。发光动力学、光子输运、PDE、渡越时间涨落和通道标定共同构成
+逐通道的时空响应\cite{huang2023joint,li2021vertex}。
+
+\subsection{光电子统计与 PMT 波形形成}
+
+给定能量沉积的位置、时间和可见能量后，单个 PMT 上的光电子到达序列通常可用
+非齐次 Poisson 点过程描述。若 \(\lambda_j(t)\) 表示通道 \(j\) 的瞬时光电子
+强度，则任意时间区间 \(A\) 内的光电子数满足
+
+\[
+N_j(A)\sim\operatorname{Poisson}
+\!\left(\int_A\lambda_j(t)\,\mathrm dt\right).
+\]
+
+光阴极热发射等过程形成近似平稳的暗噪声分量。单光电子到达时间服从由发光、
+输运和器件时间响应共同决定的概率分布。零光电子计数通过 Poisson 零计数概率
+提供对期望光强的统计约束\cite{liu2025tao}。
+
+光电子经过倍增后在阳极形成单电子响应（single-electron response，SER）。
+连续时间波形可写为
+
+\[
+w_j(s)=\sum_{k=1}^{N_j}q_{jk}v_j(s-t_{jk})+\eta_j(s),
+\]
+
+其中，\(q_{jk}\) 表示具有本征涨落的光电子电荷，\(v_j\) 表示 SER 模板，
+\(\eta_j\) 表示电子学基线噪声。相邻光电子的时间间隔接近 SER 宽度时，各脉冲
+在波形中发生叠加。波形积分主要保留总电荷信息，对光电子数目及其到达时序的
+约束较弱。实际 PMT 信号还可能包含过冲、振铃、前脉冲、后脉冲和饱和等器件
+效应\cite{jetter2012waveform,wang2026fsmp}。
+
+当能量沉积的空间尺度远小于探测器尺度时，重建可采用等效点源近似，以
+\((\mathbf r,t_0,E_{\mathrm{vis}})\) 描述光场。粒子径迹、正电子湮灭光子的
+多次康普顿散射和其他微观结构通过有效响应分布进入观测模型。空间范围较大的
+相互作用拓扑可进一步表示为多个等效光源的组合
+\cite{liu2018vertex,dou2023probe}。
+
+\subsection{单通道内的光电子脉冲重叠}
+
+单个物理事例可在同一 PMT 上产生多个时间接近的光电子。相应 SER 在电子学
+波形中相互叠加，形成波形层面的脉冲重叠。该现象由光电子到达时间分布和
+电子学脉冲宽度共同决定，也可在单一物理顶点条件下出现
+\cite{wang2026fsmp}。
+
+\subsection{同一读出窗内的多事例叠加}
+
+多个独立衰变或级联衰变可落入同一电子学读出窗。各能量沉积产生的光场在所有
+PMT 上线性叠加，形成事例堆积（pile-up）。低能 \(^{14}\mathrm{C}\) 衰变的
+随机符合能够将观测能谱扩展至更高能区\cite{bellini2014pp}。时间相近的
+\(^{212}\mathrm{Bi}\)--\(^{212}\mathrm{Po}\) 级联则提供具有物理关联的双事例
+示例。
+
+若 \(a_m\) 表示第 \(m\) 个能量沉积的光强尺度，\(R_j\) 表示通道 \(j\) 的
+单位光强时间响应，则多事例条件下的光电子强度可写为
+
+\[
+\lambda_j(t)=b_j+\sum_{m=1}^{K}
+a_m R_j(t-t_{0m}\mid\mathbf r_m).
+\]
+
+式中 \(b_j\) 表示暗噪声强度，\(K\) 表示读出窗内的等效光源数。波形层面的
+光电子脉冲重叠与事例层面的多光源叠加可以同时出现，两者分别对应通道内信号
+形成和探测器尺度事例结构。
+
+\subsection{PMT 材料相关光学本底}
+
+普通暗噪声表现为低强度、近似平稳的光电子背景。PMT 玻璃中的天然放射性还可
+诱发局域于单个器件的高光强信号。JUNO 大面积 MCP-PMT 玻璃含有可测量的
+\(^{238}\mathrm{U}\)、\(^{232}\mathrm{Th}\) 衰变链和
+\(^{40}\mathrm{K}\) 天然放射性，其材料筛选构成低本底设计的重要环节
+\cite{zhang2018glass}。
+
+器件研究已经观测到电离辐射诱发的玻璃闪烁，以及次级电子在 PMT 窗玻璃中产生
+的切伦科夫光\cite{bayat2014glass,roodbergen1972cherenkov}。快速光成分和慢速
+光成分因此构成异常波形的两类候选解释。现有证据支持 PMT 材料发光作为合理的
+仪器本底来源。具体波形的微观机制归属仍需通过独立标定、器件类型比较和
+电子学响应研究进行验证。
+
+\subsection{重建物理量与可见能量}
+
+液体闪烁体事例重建的基本物理量包括可见能量 \(E_{\mathrm{vis}}\)、等效顶点
+\(\mathbf r\) 和事例时刻 \(t_0\)。多事例条件还引入等效光源数、各光源的
+时空参数及相对光强。总电荷提供能量尺度，逐通道光强分布与光电子到达时间共同
+提供空间和时间约束。
+
+可见能量由参考粒子的探测器响应标定。它与真实沉积能量之间的关系受到粒子类型、
+电离淬灭、切伦科夫成分、光学非均匀性和电子学响应等等的共同影响。精确物理分析
+需要通过放射源、宇宙线产物或其他校准样本建立能量非线性与空间非均匀性修正。
+在此基础上，单顶点、多顶点和器件本底成分可纳入统一的概率观测模型。
+
+\section{二、算法逻辑}
+
+\subsection{研究对象与实现范围}
+
+参考实现处理 JUNO 的 17,612 个 20 英寸 PMT 通道。顶点位置以
+\(17.7\ \mathrm{m}\) 为归一化尺度，并将该尺度作为活动顶点的球形边界。PMT
+位置由独立的几何与标定文件给出。每条波形保留 1,000 个采样点，对应
+\(T=1000\ \mathrm{ns}\) 的读出窗。
+
+当前 \path{data/raw} 指向正电子事例样本。\texttt{wave\_reader\_impl.py} 依据
+\texttt{Sim/Track} 中的 \texttt{pdg\_id=-11} 选择含正电子的事例。该数据范围
+对应 IBD 正电子 prompt 信号与 \(^{14}\mathrm{C}\) 本底的叠加波形。中子俘获
+delayed 信号不在当前工作流边界之内。
+
+程序以等效点源 \((\mathbf r,t_0,E)\) 描述一次能量沉积，并在
+\(K\in\{1,2\}\) 的状态空间中采样。输出能量 \(E_m\) 采用
+参考响应 \(E_0=1.1\ \mathrm{MeV}\) 的线性缩放定义，因此表示软件标度下的
+可见能量。真实动能的物理解释还需要粒子相关的非线性标定。
+
+完整工作流依次执行两个层次的推断。
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  从每条 PMT 波形中采样光电子数量和到达时间序列。
+\item
+  联合一个事例中的全部 PMT，重建一个或两个等效点源的位置、时间和可见能量。
+\end{enumerate}
+
+波形层把每条 PMT 波形表示为若干平移 SER 的叠加。Lucy 反卷积给出 PE 到达时间
+的初始强度分布。FSMP 随后通过 birth、death 和 move proposal 改变 PE 数量、
+到达时间及单光电子增益成分，并保存供事例层使用的多组 PE 序列
+\cite{lucy1974,wang2026fsmp}。
+
+事例层把保存的 PE 序列作为隐变量样本，在 PE 序列、顶点数、顶点位置和事例时间
+之间交替采样。顶点数变化采用可逆跳跃 Markov chain Monte Carlo（RJMCMC）
+\cite{green1995}，位置、时间和 PE 序列的候选状态采用 Metropolis--Hastings（MH）
+判据\cite{hastings1970}，可见能量和混合参数采用 expectation--maximization
+（EM）更新\cite{dempster1977}。有限读出窗、采样顺序、软件参数和输出字段均按
+当前实现定义，下文给出相应公式和数据结构。
+
+\subsection{两层 Monte Carlo}
+
+原始波形、潜在 PE 序列和全部顶点参数的联合采样具有较高的状态维数和计算开销。
+参考实现采用两层分解：
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{波形层（FSMP）}：各 PMT 波形近似独立，可并行采样 PE 数量和到达时间。
+\item
+  \textbf{事例层（reconstruction）}：把 FSMP 保存的多个 PE 序列当作隐变量样本，联合全部 PMT 重建顶点。
+\end{itemize}
+
+事例层在每一步从保存的 FSMP realization 中提出新的通道级 PE 序列，并与位置、
+时间和顶点数交替采样。
+
+\subsection{符号约定}
+
+下表列出本文使用的通道、PE、顶点和采样状态符号。时间相关积分限制在当前读出
+窗内，顶点数限制为 \(K\in\{1,2\}\)。
+
+\begin{longtable}[]{@{}L{0.27\textwidth}L{0.66\textwidth}@{}}
+\toprule\noalign{}
+符号 & 含义 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\(j=1,\ldots,J\) & PMT 通道，当前 \(J=17612\) \\
+\(k=1,\ldots,n_j\) & 通道 \(j\) 中的 PE 编号 \\
+\(m=1,\ldots,K\) & 活动顶点编号，当前 \(K\in\{1,2\}\) \\
+\(\mathcal V_m=(\mathbf r_m,t_{0m})\) & 顶点的归一化位置与发生时间 \\
+\(E_m\)，\(e_m=E_m/E_0\) & 可见能量及相对参考能量，\(E_0=1.1\ \mathrm{MeV}\) \\
+\(\mathbf z_j=\{t_{jk}\}_{k=1}^{n_j}\) & 当前选择的通道 \(j\) 的 PE 时间序列 \\
+\(\mathbf z_j^\zeta\) & 第 \(\zeta\) 个已保存 FSMP 样本 \\
+\(q_{s,jr}\) & HDF5 \texttt{q\_s} 中第 \(r\) 个 1 ns cell 的非负 proposal 权重 \\
+\(q_j(t)\) & 由 \(q_{s,jr}\) 诱导的分段常数 proposal 强度 \\
+\(\nu_j(\mathbf z_j)\) & \texttt{nu\_lc}，代码定义的 PPP-like light-curve 对数权重 \\
+\(b_j\) & PMT 暗噪声率，单位 output/PE/ns \\
+\(\psi_j(t,\mathcal V_m)\) & probe 查表并乘 PMT PDE 后、每单位 \(e_m\) 的 PE 时间密度 \\
+\(\Lambda_{mj}\) & \(\psi_j\) 在当前有限读出窗内的积分 \\
+\(\epsilon\) & 一个事例中通道属于异常模型的混合比例 \\
+\end{longtable}
+
+事件编号在下文省略。所有公式都对每个事例独立应用。
+
+\subsection{波形层：FSMP}
+
+\subsubsection{波形与单 PE 响应}
+
+代码用固定基线 11,599 减去原始 ADC 波形，并只取前 1,000 个采样点。单 PE 响应（single-electron response，SER）和增益分布来自校准文件。若用 \(A_j(\mathbf z_j)\) 表示把 SER 平移到各 PE 时间后组成的矩阵，用 \(c_{jk}\) 表示每个 PE 抽到的增益混合成分，则代码所用的波形模型可以概括为
+
+\[
+\mathbf w_j\mid \mathbf z_j,\mathbf c_j
+\sim
+\mathcal N\!\left(
+A_j(\mathbf z_j)\boldsymbol\mu_j(\mathbf c_j),
+\sigma_{w,j}^2 I +
+A_j(\mathbf z_j)C_j(\mathbf c_j)A_j(\mathbf z_j)^{\mathsf T}
+\right).
+\]
+
+校准所得的 PE 电荷涨落通过高斯边缘化进入似然。每个 PE 的显式变量包括到达时间
+和增益混合成分。
+
+\subsubsection{LucyDDM 初值与 proposal}
+
+\texttt{fsmp\_prior.py} 先执行 2,000 次 Lucy 迭代，对波形作非负反卷积。反卷积结果
+经过阈值筛选、局部平滑和 \(10^{-8}\) 正则项后形成 1 ns cell 权重 \(q_{s,jr}\)。
+代码以 \(r=\lfloor t/(1\ \mathrm{ns})\rfloor\) 取值，将它解释为分段常数 proposal
+强度 \(q_j(t)\)。最右端网格点强制为 0，以限定连续时间采样区间。权重之和给出
+初始 PE 期望，按累计分布的等分位点构造初始 PE 序列。
+HDF5 中的 \texttt{mu0} 等于 \(\sum_r q_{s,jr}\)，即 LucyDDM 估计的 PE 数期望。
+\texttt{cq} 是有效 \texttt{q\_s} 在 cell 边界上的归一化 CDF，满足
+
+\[
+c_{q,j0}=0,
+\qquad
+c_{q,j,k+1}-c_{q,jk}
+=\frac{q_{s,jk}}{\sum_r q_{s,jr}},
+\qquad
+c_{q,j,-1}=1.
+\]
+
+初始序列中每个 PE 的增益混合成分由 seed 为 0 的 NumPy Generator 抽取。
+随机量按 reader 筛选后保留的原始波形行序连续生成，同一波形内按 PE 槽位取值。
+这一规范次序只定义随机量的归属，实际计算可以重排，但必须保留原有对应关系。
+
+对一个 PE 序列，代码保存的 light-curve 对数项为
+
+\[
+\nu_j(\mathbf z_j)
+=\sum_{k=1}^{n_j}\log q_j(t_{jk})-\mu_{0j},
+\]
+
+其中 \(\mu_{0j}\) 是 HDF5 中单独保存的 \texttt{mu0}。该量表示代码定义的
+PPP-like light-curve 对数权重，完整 FSMP 后验还包含波形高斯似然。上式遵循
+代码中的未归一化权重约定。
+\texttt{nu\_lc} 后续同时用于 FSMP 链记录和事例层的 independence-MH 接受率。
+
+\subsubsection{可变维采样}
+
+FSMP 执行三类 proposal：
+
+\begin{itemize}
+\tightlist
+\item
+  death：概率 \(1/4\)，随机删除一个 PE。
+\item
+  birth：概率 \(1/4\)，从 \(q_j(t)\) 的逆累计分布生成一个 PE。
+\item
+  move：概率 \(1/2\)，给随机 PE 的时间加标准正态扰动，并周期性映射回允许区间。
+\end{itemize}
+
+新的增益混合成分从校准分布抽取。接受率同时包含波形高斯似然、PPP-like
+light-curve 权重以及正反 proposal 的比值。
+
+同一 MCMC step 的 proposal 类型在该测例的全部波形间共享。该序列由 seed 和
+stream 0 确定。PE 或 proposal 时间选择量、增益选择量、时间扰动和对数接受
+阈值则由 seed、stream 1、EventID 和 channel 共同确定，并随 MCMC step 取值。
+因此，波形重排和 GPU batch 重新划分不会改变一条波形取得的 proposal 随机量。
+
+一次 birth、death 或 move 只会给波形均值和协方差带来低秩变化。实现维护约化
+二次型，并用 Woodbury 型更新把主要计算化为批量小矩阵运算：
+
+\[
+(\Sigma+UCU^{\mathsf T})^{-1}
+=\Sigma^{-1}-\Sigma^{-1}U
+(C^{-1}+U^{\mathsf T}\Sigma^{-1}U)^{-1}
+U^{\mathsf T}\Sigma^{-1}.
+\]
+
+单次 birth、death 或 move 低秩更新中的相应小矩阵至多为 \(2\times2\)，大量
+波形在 GPU 上批处理。初始化和显式重算仍需求解随 PE 数增长的约化系统。链的
+前一半作为 burn-in，之后按固定 50 步间隔把完整 PE 序列写入 Parquet。
+
+\subsection{Probe 与事例似然}
+
+\subsubsection{查表响应}
+
+probe 采用离散查表响应。对顶点 \(\mathbf r_m\) 和 PMT 位置 \(\mathbf p_j\)，代码构造
+
+\[
+x_{mj}=\frac{\mathbf r_m\cdot\mathbf p_j}{\lVert\mathbf p_j\rVert},
+\qquad
+y_{mj}=\frac{\lVert\mathbf r_m\times\mathbf p_j\rVert}{\lVert\mathbf p_j\rVert},
+\]
+
+在二维 \((x,y)\) histogram 上做双线性插值，再按 PMT 的 TTS group 选择 1 ns
+时间模板并乘该 PMT 的 PDE。时间方向采用 histogram bin 内分段常数表示。
+与只校正直线飞行时间的响应相比，该查表响应还编码了探测器边界光学造成的
+位置相关光收集效率和到达时间分布变化\cite{dou2023probe,liu2025tao}。
+
+电子学模拟采用的 PMT 校准约定是
+
+\[
+t_{\mathrm{observed}}=t_{\mathrm{physics}}+\Delta t_j,
+\]
+
+其中 \(\Delta t_j\) 是 PMT 文件中的 \texttt{offset}。reconstruction 的响应查表
+使用 \(t_{\mathrm{observed}}-\Delta t_j-t_{0m}\)。固定 PMT 文件的全部 offset
+均为 0，逐 PE 响应和有限窗积分因此使用相同的时间坐标。
+
+令
+
+\[
+\Lambda_{mj}(\mathcal V_m)
+=\int_0^T\psi_j(t,\mathcal V_m)\,\mathrm dt.
+\]
+
+该积分定义于读出窗 \([0,T)\)，因此随 \(t_{0m}\) 改变，其物理含义为有限窗内的
+期望光强。实现用每 8 个时间 bin 一个前缀锚点，再补加至多 7 个完整 bin 和
+1 个部分 bin，保持分段常数模型下的积分精确性。
+
+\subsubsection{正常闪烁光与暗噪声}
+
+给定当前 PE 序列和 \(K\) 个顶点，第 \(j\) 个 PMT 的第 \(k\) 个 PE 处的总强度为
+
+\[
+\rho_{jk}
+=b_j+\sum_{m=1}^{K}e_m\psi_j(t_{jk},\mathcal V_m).
+\]
+
+正常闪烁光假设下的 Poisson 点过程对数似然为
+
+\[
+\ell_j^{\mathrm N}
+=\sum_{k=1}^{n_j}\log\rho_{jk}
+-\left[b_jT+\sum_{m=1}^{K}e_m\Lambda_{mj}(\mathcal V_m)\right].
+\]
+
+暗噪声积分 \(b_jT\) 每个 PMT 只加一次，与顶点数无关。
+
+\subsubsection{异常高光强通道}
+
+将通道 \(j\) 的 PE 时间升序排列。代码定义
+
+\[
+\Delta T_j=
+\begin{cases}
+\max\!\left(
+t_{[\operatorname{round}(0.95(n_j-1))]}
+-t_{[\operatorname{round}(0.05(n_j-1))]},
+5\ \mathrm{ns}
+\right), & n_j>2,\\[4pt]
+T, & n_j\le 2.
+\end{cases}
+\]
+
+方括号表示从 0 开始的排序索引。percentile 值由排序数组的整数
+\texttt{round} 索引选取。异常模型的对数 pseudo-likelihood 为
+
+\[
+\ell_j^{\mathrm A}
+=n_j\log\frac{\lambda_{\mathrm{high}}}{\Delta T_j}
+-\lambda_{\mathrm{high}}.
+\]
+
+正式 Make 流程采用 \texttt{--lhigh} 的默认值
+
+\[
+\lambda_{\mathrm{high}}=50.
+\]
+
+\subsubsection{二元混合}
+
+通道属于正常模型和异常模型的先验概率分别为 \(1-\epsilon\) 与 \(\epsilon\)。代码使用数值稳定的 \texttt{logsumexp} 计算
+
+\[
+\ell_j
+=\log\left[(1-\epsilon)e^{\ell_j^{\mathrm N}}
++\epsilon e^{\ell_j^{\mathrm A}}\right],
+\qquad
+\ell=\sum_{j=1}^{J}\ell_j.
+\]
+
+虽然 FSMP 文件只显式保存有候选 PE 的通道，事例总似然和 \(\epsilon\) 更新仍覆盖全部 17,612 个 PMT。对无 hit 通道，正常与异常分支分别只剩 \(-[b_jT+\sum_m e_m\Lambda_{mj}]\) 和 \(-\lambda_{\mathrm{high}}\)，之后仍按上式做混合。
+
+\subsection{能量与异常比例的 EM 更新}
+
+正常通道的后验概率为
+
+\[
+p_j^{\mathrm N}
+=\frac{(1-\epsilon)e^{\ell_j^{\mathrm N}}}
+{(1-\epsilon)e^{\ell_j^{\mathrm N}}+\epsilon e^{\ell_j^{\mathrm A}}},
+\qquad
+p_j^{\mathrm A}=1-p_j^{\mathrm N}.
+\]
+
+第 \(j\) 个 PMT 的第 \(k\) 个 PE 归属于顶点 \(m\) 的软权重为
+
+\[
+Q_{mjk}
+=p_j^{\mathrm N}
+\frac{e_m\psi_j(t_{jk},\mathcal V_m)}
+{b_j+\sum_l e_l\psi_j(t_{jk},\mathcal V_l)}.
+\]
+
+M-step 更新为
+
+\[
+e_m\leftarrow
+\frac{\sum_{jk}Q_{mjk}}
+{\sum_jp_j^{\mathrm N}\Lambda_{mj}(\mathcal V_m)},
+\qquad
+E_m=e_mE_0,
+\]
+
+以及
+
+\[
+\epsilon\leftarrow
+1-\frac{1}{J}\sum_jp_j^{\mathrm N}.
+\]
+
+\(\epsilon\) 被限制在 \([10^{-7},1-10^{-7}]\)。当前 Make 流程中，每次需要重新
+profile 能量的 likelihood evaluation 都从 \(e_m=1\)、
+\(p_j^{\mathrm N}=0.9999\) 开始，并执行 20 次定长更新。PE 序列 proposal 的
+likelihood evaluation 沿用当前 \(E_m\) 和 \(\epsilon\)。因此二者是各候选
+顶点状态下通过确定性迭代得到的近似 profile 参数。
+
+\subsection{事例层 MH/RJMCMC 与 profile EM}
+
+\subsubsection{PE 序列交换}
+
+每个事例层 MCMC step 根据由 seed、EventID 和 step 确定的 PCG64 随机流取得
+一个 FSMP realization 编号 \(\zeta\)。该事例的全部通道使用同一编号。此后
+每个真实通道根据由 seed、EventID、物理 channel 和 step 无状态映射得到的接受
+阈值，独立决定是否采用相应的 \(\mathbf z_j^\zeta\)。接受条件为
+
+\[
+\log u_j
+<
+\left[\ell_j(\mathbf z'_j)-\nu_j(\mathbf z'_j)\right]
+-\left[\ell_j(\mathbf z_j)-\nu_j(\mathbf z_j)\right],
+\qquad u_j\sim U(0,1).
+\]
+
+这里 \(\ell_j\) 是正常/异常混合后的通道似然。若一个事例至少有一个通道接受新的 PE 序列，
+代码会为该事例重新执行 EM，并同步接受的 PE 数与时间、通道及总似然、能量和
+私有 observation cache。当前状态转移同时保留更新前的 \texttt{epsilon}、
+\texttt{Q}、异常概率 \texttt{abn} 和异常通道标记 \texttt{wavel\_ch}。下一次
+PE independence-MH 接受率继续使用该 \texttt{epsilon}。这一规则反映当前实现
+的状态更新顺序。
+
+\subsubsection{顶点数、位置和时间}
+
+每个外层 step 在 PE 序列交换后按固定顺序执行：
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  dimension sub-step：birth、death 或维持当前顶点数。
+\item
+  position sub-step：随机选择一个活动顶点并改变三维位置。
+\item
+  time sub-step：重新随机选择一个活动顶点并改变时间。
+\end{enumerate}
+
+position 和 time sub-step 在 dimension proposal 完成后依次执行。因此每个外层
+step 均包含 dimension、position 和 time 三个子步骤。
+
+dimension schedule 的基础概率为 birth/death/dimension-preserving
+\(=0.4/0.4/0.2\)。burn-in 前 10\% 维持当前顶点数，10\%--25\% 执行 birth，
+25\% 之后采用由 seed 和 MCMC step 确定的基础 schedule。全部事例在同一 step 共用
+dimension move 类型和 proposal scale，该对应关系不依赖 event block 划分。
+
+birth 在单位球内均匀产生位置，并在 \([-200,950]\) ns 均匀产生时间。能量随后由 EM 给出。death 从当前活动顶点中均匀选择一个。记候选状态与当前状态的总混合对数似然差为 \(\Delta\ell\)，代码的接受对数为
+
+\[
+\log\alpha_{\mathrm{birth}}
+=\Delta\ell+\log S-\log(K+1),
+\]
+
+\[
+\log\alpha_{\mathrm{death}}
+=\Delta\ell-\log S+\log K,
+\]
+
+\[
+\log\alpha_{\mathrm{position/time}}=\Delta\ell,
+\]
+
+其中顶点数先验的强度积分与 birth 时间窗一致：
+
+\[
+S=(2\times10^5\ \mathrm{Hz})\,[950-(-200)]\ \mathrm{ns}=0.23.
+\]
+
+\(S\) 是预先配置的顶点数先验超参数。样本 pile-up 率需要通过独立统计估计。
+
+候选还必须满足
+
+\[
+\lVert\mathbf r_m\rVert\le1,
+\qquad -200\le t_{0m}\le950\ \mathrm{ns},
+\qquad E_m>0.025\ \mathrm{MeV}.
+\]
+
+position 的基础高斯标准差为 0.005 个探测器半径，time 为 2 ns，并乘随链变化的 scale。前 10\% 使用从 20 平滑下降到 1 的余弦 scale。双顶点链随后依次使用 40（10\%--20\%）、20（20\%--25\%）、5（25\% 至约 33\%）和 1（其余部分）。
+
+\subsubsection{初值}
+
+reconstruction 从首个 FSMP realization 初始化单顶点。若 \(d_j\) 是 PMT 的 PDE，
+\(\mathbf p_j\) 是归一化 PMT 位置，则
+
+\[
+E^{(0)}=\frac{1}{8500}\sum_j\frac{n_j}{d_j},
+\qquad
+\mathbf r^{(0)}
+=1.5\,
+\frac{\sum_j(n_j/d_j)\mathbf p_j}{\sum_j(n_j/d_j)},
+\qquad
+t_0^{(0)}=0.
+\]
+
+式中的 8,500 是 \texttt{src/detector.py} 用于初值的启发式 \texttt{npe} 常数，代码
+注释将其标为待校准。该常数、参考能量 \(E_0=1.1\ \mathrm{MeV}\) 和完整探测器
+光电子产额 1,345 output/PE/MeV 分别采用不同的定义与标度。
+
+若 \(\lVert\mathbf r^{(0)}\rVert>1\)，位置沿原方向缩到半径 0.95。活动顶点数
+从 \(K=1\) 开始，第二个顶点槽位初始化为 0，随后由 RJMCMC 探索
+\(K\in\{1,2\}\)。
+
+\section{三、算法实现}
+
+\subsection{计算流程}
+
+Makefile 中的三阶段依赖关系为：
+
+\begin{verbatim}
+data/raw/<id>.h5 --> output/sparsify/<id>.h5 --> output/PE/<id>.pq --> output/tvE/<id>.h5
+\end{verbatim}
+
+\begingroup
+\small
+\begin{longtable}[]{@{}L{0.20\textwidth}L{0.27\textwidth}L{0.46\textwidth}@{}}
+\toprule\noalign{}
+阶段与程序 & 当前 Make 参数 & 作用 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+1 / \path{src/fsmp_prior.py} & 2,000 次 Lucy 迭代、默认阈值 0.1、seed 0 & 从原始波形生成 LucyDDM 初值和 FSMP proposal \\
+2 / \path{src/fsmp.py} & 4,000 steps，\path{full-step=50}、seed 0 & 执行 FSMP，后半链保存 40 个 PE 序列 \\
+3 / \path{src/main.py} & 2,000 MCMC steps，20 EM steps，最多 2 顶点，10 个 event blocks、seed 0 & 由首个 FSMP realization 按能量与电荷重心公式初始化 \(K=1\)，输出最终一/双顶点采样链 \\
+\end{longtable}
+\endgroup
+
+\subsection{并行结构与主要计算量}
+
+本题既有规则张量，也有强烈的不规则性：每个事例的点亮 PMT 数、每条波形的候选时间格点数和 PE 数都不同。
+
+\begin{itemize}
+\tightlist
+\item
+  FSMP 按候选长度排序，并根据显存估算动态分块。同一批波形共享 MCMC step，在 GPU 上进行 float64 二次型和小矩阵运算。
+\item
+  事例重建把不等长数据补齐成张量。主要响应张量的形状近似为 \((K,B,C,P)\)：顶点数、block 内事例数、点亮通道数和每通道最大 PE 数。积分响应还需要 \((K,B,17612)\)。
+\item
+  probe 的逐 hit 响应和有限窗积分由 HIP RawKernel 完成。每个顶点 proposal 都会触发响应插值、20 次 EM 以及全 PMT mixture likelihood。
+\item
+  \texttt{FullReader} 在 CPU 上整理 Parquet，重建线程计算当前 block 时，另一个线程预取下一个 block。
+\item
+  优化时需要同时关注 kernel、显存占用、CPU--GPU 传输、Parquet/HDF5 写入和随机量生成。
+\end{itemize}
+
+\section{四、题目约定}
+
+\subsection{测例与运行目标}
+
+对编号为 \texttt{<id>} 的输入，正式运行目标为：
+
+\begin{verbatim}
+make output/tvE/<id>.h5
+\end{verbatim}
+
+测例分为三组：
+
+\begin{longtable}[]{@{}L{0.20\textwidth}L{0.22\textwidth}L{0.51\textwidth}@{}}
+\toprule\noalign{}
+输入 & 用途 & 发布内容 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\path{data/raw/one.h5} & 示例输入 & 输入和参考结果均公开，不参与正式评测 \\
+\path{data/raw/0-9.h5} & 10 个公开测例 & 输入和 FP64 参考摘要公开，供正确性检查和性能调试 \\
+\path{data/raw/10-19.h5} & 10 个隐藏测例 & 输入和 FP64 参考摘要仅在评测端使用 \\
+\end{longtable}
+
+FSMP 保存 step \(2000,2050,\ldots,3950\) 共 40 个 PE 序列。Makefile 使用当前 Python 环境在本机 GPU 上运行各阶段。选手可以保持参考计算精度并优化
+实现，也可以采用较低精度或混合精度。后一类实现仍需满足正式的结果误差要求。
+
+\subsection{确定性随机映射}
+
+\texttt{fsmp\_prior.py}、\texttt{src/fsmp.py} 和 \texttt{src/main.py} 均使用
+\texttt{--seed=0}。seed、生成器、stream 编号、消费顺序、数组类型、
+分布变换和随机量的逻辑归属共同定义固定随机试验。
+
+随机量映射如下：
+
+\begingroup
+\small
+\begin{longtable}[]{@{}L{0.25\textwidth}L{0.68\textwidth}@{}}
+\toprule\noalign{}
+用途 & 生成与逻辑归属 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+LucyDDM 初始增益 & \texttt{np.random.default\_rng(seed)} 按 reader 筛选后保留的原始波形行序连续生成，同一波形内按初始 PE 槽位取值 \\
+FSMP proposal 类型 & \texttt{PCG64(SeedSequence([seed,0]))} 按 MCMC step 生成，并向全部波形广播 \\
+FSMP 波形随机量 & 每个 \texttt{(EventID,channel)} 使用 \texttt{PCG64(SeedSequence([seed,1,EventID,channel]))}。该流依次生成整段 PE 或 proposal 时间选择量、整段增益选择量、整段 float64 标准正态时间扰动和整段对数接受阈值 \\
+reconstruction dimension & PCG64 stream 0 按 MCMC step 生成 float32 均匀随机量，全部事例共用同一 schedule \\
+FSMP realization & 每个 EventID 使用独立的 PCG64 stream 1，并按 MCMC step 生成 realization 编号 \\
+逐通道交换接受阈值 & stream 2 采用无状态 SplitMix64 映射，逻辑坐标为 seed、EventID、物理 channel 和 MCMC step。映射结果转为严格位于 \((0,1)\) 的 float32 均匀随机量，再取对数 \\
+事例与顶点 proposal & 每个 EventID 分别使用 PCG64 stream 3 至 6。它们依次对应四路对数接受阈值、五路 float32 正态 proposal、三路顶点选择量和由四路 float32 均匀随机量变换得到的 birth proposal \\
+\end{longtable}
+\endgroup
+
+PCG64 状态流和 reconstruction 的分布变换均在 CPU 上生成。逐通道接受阈值在
+每个 step 生成为当前 event block 所需的二维数组，再传入 GPU。
+\texttt{recon\_random.py} 中的 SeedSequence 整数编码、
+SplitMix64 常量、float32 变换和各 stream 的数组形状给出规范实现。
+
+GPU batch、event block、并行调度以及相互独立波形、事例和通道的执行顺序不参与
+随机量寻址。调整这些实现划分时，同一个逻辑 proposal 必须取得相同的随机量。
+Lucy prior 若重排波形，也必须保持规范波形行序和 PE 槽位对应的原始随机归属。
+参赛实现可以采用不同的内部生成方式，但必须复现规定的随机量映射。
+
+\subsection{唯一参考与结果比较}
+
+确定性随机映射只能保证所有实现面对同一个随机试验，不能保证不同精度或不同机器
+生成逐位相同的完整 MCMC 链。当 likelihood 差接近随机接受阈值时，微小的浮点
+舍入差异即可改变一次接受判断，后续链状态也会随之分离。要求完整链逐位一致还需
+固定浮点运算次序、归约次序、数学库和计算精度，这与本题允许的性能优化范围冲突。
+
+命题方在指定的 GPU、软件环境和 FP64 参考实现上对每个测例运行一次，随后冻结
+参考结果及其哈希。评测过程不在参赛机器上重新生成参考结果。正式比较忽略 HDF5
+压缩、属性和物理存储布局，也不逐 step 比较 \texttt{/Recon} 链，而是由固定的
+后处理程序提取事件级摘要。
+
+后处理固定使用每条最终重建链的最后 30\% 样本。每个 EventID 的摘要包含一顶点
+和双顶点状态的后验权重，以及各状态下顶点 \texttt{x,y,z,E,t} 的条件均值。
+双顶点没有物理标签，比较时将两个顶点作为无序集合，并在两种对应关系中取误差
+较小者。EventID 和摘要结构进行精确比较，连续字段相对冻结的 FP64 参考摘要进行
+分字段误差比较。具体容差和性能评分方法在评分方案中另行规定。
+
+本约定中的“结果唯一”是指随机映射唯一、FP64 参考结果唯一和比较规则唯一。
+参赛实现的原始中间量和完整 MCMC 链不要求逐位相同。
+
+\subsection{固定外部数据}
+
+Make DAG 声明以下六类外部文件输入：
+
+\begingroup
+\small
+\begin{longtable}[]{@{}L{0.29\textwidth}L{0.19\textwidth}L{0.45\textwidth}@{}}
+\toprule\noalign{}
+Make 节点、变量与路径 & 使用阶段 & 实际读取内容 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\path{data/raw/<id>.h5} & Lucy prior & \path{CdWaveform/Waveform} 的 \path{id,pmt_id,adc} 和 \path{Sim/Track} 的 \path{id,pdg_id} \\
+\texttt{SERFile}\newline\path{data/ser_truth_J25.7.4+.h5} & Lucy prior、FSMP & \path{ser} 与 \path{gain} 数据集中的 SER、噪声和增益混合参数 \\
+\texttt{JunoidFile}\newline\path{data/junoid_J25.3.0.pq} & Lucy prior & \path{channel,id,copy_number}，把 PMT identifier 映射为连续通道号 \\
+\texttt{PMTFile}\newline\path{data/PMT_J26.4.0.h5} & reconstruction & \path{PMT} 的 \path{darkrate,PDE,offset}。通道由行号给出 \\
+\texttt{ProbeFile}\newline\path{data/sim.h5} & reconstruction & \path{probe_t,x_centers,y_centers,t_centers,tts_group} \\
+\texttt{PMTPosFile}\newline\path{data/J25.3.0.PMTPos_CD_LPMT.csv} & reconstruction & 每个连续通道的 PMT 三维位置 \\
+\end{longtable}
+\endgroup
+
+原始波形的 \texttt{adc} 至少包含 1,000 个采样点。当前 reader 选取
+\texttt{Sim/Track} 中含 \texttt{pdg\_id=-11} 的事例。有效波形还需满足
+\texttt{JunoidFile} 的通道映射条件。PMT 校准、TTS group 和位置表均以数组
+行号作为连续通道号，因此需要保持 \(0,\ldots,17611\) 的行序。
+
+\texttt{JunoidFile} 和 \texttt{PMTPosFile} 在 Make DAG 中作为固定依赖列出。
+当前 Python 实现也直接使用这两个文件名。替换这些输入需要同时修改 Make 依赖
+和对应的程序参数或文件路径。
+
+\subsection{中间产物}
+
+\begin{longtable}[]{@{}L{0.21\textwidth}L{0.72\textwidth}@{}}
+\toprule\noalign{}
+产物 & 关键内容 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{output/sparsify/*.h5} & \texttt{tq(t\_s,q\_s,cq)}、初始 \texttt{s/e}、波形 \texttt{z}、\texttt{mu0}、\texttt{index(eid,ch,offset,s0,l\_t,l\_wave,sig2w)} 和 \texttt{index\_0PE} \\
+\texttt{output/PE/*.pq} & \texttt{eid,ch,offset,step,PEt,e,q,nu\_lc}，保存的完整 FSMP 状态。\texttt{PEt} 已加 \texttt{tq.t\_s{[}0{]}}，\texttt{offset} 在后续读取时加入。\texttt{q} 为 \texttt{list\textless{}float64\textgreater{}}。MMSE 当前处于关闭状态，列表元素取 null \\
+\texttt{output/tvE/*.h5} & 最终一/双顶点 \texttt{/Recon} 链 \\
+\end{longtable}
+
+\texttt{FullReader} 读取 Parquet 时把波形局部原点 \texttt{index.offset} 加回
+\texttt{PEt}，得到观测时间。reconstruction 随后减去 \texttt{PMTFile} 中的
+PMT time offset。两类 offset 分别执行局部原点恢复和 PMT 时间校准，需要按
+上述顺序与符号处理。
+
+\subsection{最终输出}
+
+\texttt{output/tvE/\textless{}id\textgreater{}.h5} 的核心数据集 \texttt{/Recon} 形状为
+
+\begin{verbatim}
+(2, number_of_events, 2000)
+\end{verbatim}
+
+第一维是最多两个顶点的槽位，第三维是 MCMC step。复合字段包括：
+
+\begin{longtable}[]{@{}L{0.18\textwidth}L{0.75\textwidth}@{}}
+\toprule\noalign{}
+字段 & 含义 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{EventID}, \texttt{step} & 事例与链步编号 \\
+\texttt{move} & 本 step 的 dimension schedule：\texttt{1} birth、\texttt{-1} death、\texttt{0} 维持顶点数 \\
+\texttt{count} & 当前活动顶点数 \\
+\texttt{x,y,z} & 以 17.7 m 为单位的归一化位置 \\
+\texttt{E}, \texttt{t} & 可见能量（MeV）与时间（ns） \\
+\texttt{NPE} & 当前事例所有显式通道的 PE 总数 \\
+\texttt{Likelihood} & 全部 PMT 的混合对数似然之和 \\
+\texttt{epsilon} & 事件级异常通道混合比例 \\
+\texttt{acceptv} & dimension move 非零时记录其接受状态。\texttt{move=0} 时记录 position move 的接受状态。time move 接受状态位于该字段定义范围之外 \\
+\end{longtable}
+
+事例级字段会在两个顶点槽位中重复。当 \texttt{count=1} 时，第二个槽位的
+\texttt{x,y,z,E,t} 保持为 0。输出保留完整采样链和每个 MCMC step 的状态。
+该文件是规范化摘要的输入，不直接作为跨实现的逐 step 正确性比较对象。
+
+\subsection{实现边界}
+
+本题考查上述固定算法的等价实现与性能优化，不考查算法设计。参赛程序必须完成
+与三阶段流程等价的全部逻辑计算，保持各阶段的数学模型、状态转移、数据选择、
+随机量语义和阶段衔接不变。以下计算参数属于题目定义，不得修改：
+
+\begin{longtable}[]{@{}L{0.31\textwidth}L{0.62\textwidth}@{}}
+\toprule\noalign{}
+阶段 & 固定参数 \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+LucyDDM prior & 2,000 次 Lucy 迭代，候选阈值为 0.1 \\
+FSMP & 4,000 个 MCMC steps，舍弃前半链，保留 step \(2000,2050,\ldots,3950\) \\
+reconstruction & 2,000 个 MCMC steps，每次能量和 \(\epsilon\) 更新执行 20 个 EM steps，顶点数为 1 或 2，\(\lambda_{\mathrm{high}}=50\) \\
+结果摘要 & 固定使用最终重建链的最后 30\% 样本 \\
+确定性随机映射 & 全部随机阶段固定 seed 为 0。生成器、stream 编号、消费顺序、数组类型、分布变换和逻辑归属不得修改 \\
+\end{longtable}
+
+算法逻辑部分给出的 likelihood、proposal 分布、proposal scale、dimension
+schedule、接受判据、参数边界、常量和状态更新顺序同样固定。确定性随机映射
+生成的每个随机量必须继续对应同一个逻辑 proposal。不得通过减少迭代步数、提前
+停止、跳过计算阶段、删去 PMT 或 PE、缩减候选集合、改变采样分布或替换重建方法
+获得性能提升。
+
+在不改变上述算法和参数的前提下，可以优化代码结构、等价的数学表达、GPU kernel、
+向量化、kernel fusion、并行调度、内存布局、缓存、CPU--GPU 传输和文件 I/O。
+event block 数量、GPU batch 大小以及相互独立事例或 FSMP 波形的实际执行顺序属于
+实现划分，可以调整。Lucy prior 也可以重排计算，但必须先按规范波形行序确定随机
+量归属。允许融合相邻阶段或不物化中间文件，但不得省略对应的逻辑计算。
+这些调整不得改变随机量与规范波形行序、PE 槽位、EventID、channel、MCMC step
+和 proposal 用途之间的对应关系。参赛程序也可以采用较低精度或混合精度计算，
+但结果必须满足正式的误差要求。
+
+最终输出文件允许采用不同的压缩、chunk 和物理存储布局，但必须保留规定的数据集、
+字段、单位和逻辑内容。评测只认可由上述固定计算得到的结果，不接受预先写入结果或
+针对公开测例硬编码输出。
+
+\phantomsection
+\addcontentsline{toc}{section}{参考文献}
+\begingroup
+\small
+\begin{thebibliography}{99}
+
+\bibitem{juno2022}
+JUNO Collaboration (A.~Abusleme et al.),
+``JUNO physics and detector,''
+\emph{Progress in Particle and Nuclear Physics} \textbf{123} (2022) 103927.
+\url{https://doi.org/10.1016/j.ppnp.2021.103927}.
+
+\bibitem{huang2023joint}
+G.-H.~Huang, W.~Jiang, L.-J.~Wen, Y.-F.~Wang, and W.-M.~Luo,
+``Data-driven simultaneous vertex and energy reconstruction for large liquid
+scintillator detectors,''
+\emph{Nuclear Science and Techniques} \textbf{34} (2023) 83.
+\url{https://doi.org/10.1007/s41365-023-01240-0}.
+
+\bibitem{juno2025resolution}
+JUNO Collaboration,
+``Prediction of energy resolution in the JUNO experiment,''
+\emph{Chinese Physics C} \textbf{49} (2025) 013003.
+\url{https://doi.org/10.1088/1674-1137/ad83aa}.
+
+\bibitem{liu2018vertex}
+Q.~Liu, M.~He, X.~Ding, W.~Li, and H.~Peng,
+``A vertex reconstruction algorithm in the central detector of JUNO,''
+\emph{Journal of Instrumentation} \textbf{13} (2018) T09005.
+\url{https://doi.org/10.1088/1748-0221/13/09/T09005}.
+
+\bibitem{dou2023probe}
+W.~Dou, B.~Xu, J.~Zhou, Z.~Wang, and S.~Chen,
+``Reconstruction of point events in liquid-scintillator detectors subjected
+to total internal reflection,''
+\emph{Nuclear Instruments and Methods in Physics Research A} \textbf{1057}
+(2023) 168692.
+\url{https://doi.org/10.1016/j.nima.2023.168692}.
+
+\bibitem{zhang2020optics}
+Y.~Zhang, Z.-Y.~Yu, X.-Y.~Li, Z.-Y.~Deng, and L.-J.~Wen,
+``A complete optical model for liquid-scintillator detectors,''
+\emph{Nuclear Instruments and Methods in Physics Research A} \textbf{967}
+(2020) 163860.
+\url{https://doi.org/10.1016/j.nima.2020.163860}.
+
+\bibitem{li2021vertex}
+Z.-Y.~Li, Y.-M.~Zhang, G.-F.~Cao, et al.,
+``Event vertex and time reconstruction in large-volume liquid scintillator
+detectors,''
+\emph{Nuclear Science and Techniques} \textbf{32} (2021) 49.
+\url{https://doi.org/10.1007/s41365-021-00885-z}.
+
+\bibitem{liu2025tao}
+X.~Liu, W.~Dou, B.~Xu, H.~Wang, and G.~Cao,
+``First-principle event reconstruction by time-charge readouts for TAO,''
+\emph{European Physical Journal C} \textbf{85} (2025) 438.
+\url{https://doi.org/10.1140/epjc/s10052-025-14161-6}.
+
+\bibitem{jetter2012waveform}
+S.~Jetter, D.~Dwyer, W.-Q.~Jiang, et al.,
+``PMT waveform modeling at the Daya Bay experiment,''
+\emph{Chinese Physics C} \textbf{36} (2012) 733--741.
+\url{https://doi.org/10.1088/1674-1137/36/8/009}.
+
+\bibitem{wang2026fsmp}
+Y.~Wang, A.~Zhang, Y.~Wu, B.~Xu, X.~Liu, J.~Chen, Z.~Wang, and S.~Chen,
+``The Fast Stochastic Matching Pursuit for neutrino and dark matter
+experiments,''
+\emph{Nuclear Instruments and Methods in Physics Research A} \textbf{1082}
+(2026) 170986.
+\url{https://doi.org/10.1016/j.nima.2025.170986}.
+
+\bibitem{bellini2014pp}
+G.~Bellini et al. (Borexino Collaboration),
+``Neutrinos from the primary proton--proton fusion process in the Sun,''
+\emph{Nature} \textbf{512} (2014) 383--386.
+\url{https://doi.org/10.1038/nature13702}.
+
+\bibitem{zhang2018glass}
+X.~Zhang, J.~Zhao, S.~Liu, S.~Niu, X.~Han, L.~Wen, J.~He, and T.~Hu,
+``Study on the large area MCP-PMT glass radioactivity reduction,''
+\emph{Nuclear Instruments and Methods in Physics Research A} \textbf{898}
+(2018) 67--71.
+\url{https://doi.org/10.1016/j.nima.2018.05.008}.
+
+\bibitem{bayat2014glass}
+E.~Bayat, V.~Doust-Mohammadi, P.~Ghorbani, N.~Ghal-Eh, and R.~Mohammadi,
+``Scintillation of XP2020 PMT glass window,''
+\emph{Radiation Physics and Chemistry} \textbf{102} (2014) 1--4.
+\url{https://doi.org/10.1016/j.radphyschem.2014.04.009}.
+
+\bibitem{roodbergen1972cherenkov}
+S.~Roodbergen, R.~Kroondijk, and H.~Verheul,
+``Cherenkov radiation in photomultiplier windows and the resulting time shift
+in delayed coincidence time spectra,''
+\emph{Nuclear Instruments and Methods} \textbf{105} (1972) 551--555.
+\url{https://doi.org/10.1016/0029-554X(72)90353-9}.
+
+\bibitem{lucy1974}
+L.~B.~Lucy,
+``An iterative technique for the rectification of observed distributions,''
+\emph{The Astronomical Journal} \textbf{79} (1974) 745--754.
+\url{https://doi.org/10.1086/111605}.
+
+\bibitem{green1995}
+P.~J.~Green,
+``Reversible jump Markov chain Monte Carlo computation and Bayesian model
+determination,''
+\emph{Biometrika} \textbf{82} (1995) 711--732.
+\url{https://doi.org/10.1093/biomet/82.4.711}.
+
+\bibitem{hastings1970}
+W.~K.~Hastings,
+``Monte Carlo sampling methods using Markov chains and their applications,''
+\emph{Biometrika} \textbf{57} (1970) 97--109.
+\url{https://doi.org/10.1093/biomet/57.1.97}.
+
+\bibitem{dempster1977}
+A.~P.~Dempster, N.~M.~Laird, and D.~B.~Rubin,
+``Maximum likelihood from incomplete data via the EM algorithm,''
+\emph{Journal of the Royal Statistical Society: Series B} \textbf{39}
+(1977) 1--38.
+\url{https://doi.org/10.1111/j.2517-6161.1977.tb01600.x}.
+
+\end{thebibliography}
+\endgroup
+
+\end{document}

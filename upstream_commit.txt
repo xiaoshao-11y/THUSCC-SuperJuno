@@ -1,0 +1,2 @@
+82f25ea67f10ede8881f4dd4656ad78cc40cfd5f preliminary
+(https://github.com/thu-scc/SuperJUNO, cloned by the supervisor into upstream/)

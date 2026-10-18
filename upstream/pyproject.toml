@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "superjuno"
+version = "0.1.0"
+description = "PMT waveform and event reconstruction pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "cupy",
+    "numpy",
+    "scipy",
+    "h5py",
+    "hdf5plugin",
+    "pandas",
+    "pyarrow",
+    "numexpr",
+    "duckdb",
+    "tqdm",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = [
+    "detector",
+    "fsmp",
+    "fsmp_prior",
+    "fsmp_reader",
+    "main",
+    "mcmc",
+    "recon",
+    "recon_random",
+    "wave_reader",
+    "wave_reader_impl",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["analysis*"]
+
+[tool.setuptools.package-data]
+"analysis.fsmp" = ["*.cu"]

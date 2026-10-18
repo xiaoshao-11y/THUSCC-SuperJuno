@@ -1,0 +1,8 @@
+# 构建产物与缓存（可重建）
+build/
+__pycache__/
+*.o
+*.py[cod]
+
+# 官方仓库 .git 原件暂存（恢复方法见 upstream/SOURCE.md）
+upstream/official_git_backup/
