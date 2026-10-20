@@ -1,0 +1,25 @@
+Miniforge3-24.11 loaded successful
+test_field_widths_views_and_orders (__main__.TestAgainstExtractedUpstream.test_field_widths_views_and_orders) ... [SUPERJUNO] sjrng C++ random backend active (/data/home/sczf074/build/SuperJUNO/cpp/_sjrng_core.so)
+ok
+test_large_identities_and_alternate_seed (__main__.TestAgainstExtractedUpstream.test_large_identities_and_alternate_seed) ... ok
+test_many_streams_hit_normal_slow_paths (__main__.TestAgainstExtractedUpstream.test_many_streams_hit_normal_slow_paths) ... ok
+test_pipeline_shaped_two_field_view (__main__.TestAgainstExtractedUpstream.test_pipeline_shaped_two_field_view) ... ok
+test_float_fields_rejected (__main__.TestRequesterValidation.test_float_fields_rejected) ... ok
+test_negative_ids_rejected (__main__.TestRequesterValidation.test_negative_ids_rejected) ... ok
+test_non_integer_scalar_arguments_rejected (__main__.TestRequesterValidation.test_non_integer_scalar_arguments_rejected) ... ok
+test_uint64_above_int64_max_rejected (__main__.TestRequesterValidation.test_uint64_above_int64_max_rejected) ... ok
+test_uint64_in_range_accepted (__main__.TestRequesterValidation.test_uint64_in_range_accepted) ... ok
+test_accepts_are_log_of_uniform (__main__.TestSjrngBitExact.test_accepts_are_log_of_uniform) ... ok
+test_alternate_seeds (__main__.TestSjrngBitExact.test_alternate_seeds) ... ok
+test_boundary_ids (__main__.TestSjrngBitExact.test_boundary_ids) ... ok
+test_official_seed_small (__main__.TestSjrngBitExact.test_official_seed_small) ... ok
+test_official_seed_trials_4000 (__main__.TestSjrngBitExact.test_official_seed_trials_4000) ... ok
+test_thread_count_invariance (__main__.TestSjrngBitExact.test_thread_count_invariance) ... ok
+test_trials_one_and_empty (__main__.TestSjrngBitExact.test_trials_one_and_empty) ... ok
+test_ziggurat_branches_exercised (__main__.TestSjrngBitExact.test_ziggurat_branches_exercised) ... ok
+test_benchmark (__main__.TestSjrngMicroBenchmark.test_benchmark) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 3.227s
+
+OK

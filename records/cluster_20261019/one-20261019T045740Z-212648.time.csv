@@ -1,0 +1,5 @@
+stage,start_utc,end_utc,real_s,exit_code,output_bytes,target
+01_fsmp_prior,2026-10-19T04:57:40Z,2026-10-19T04:58:15Z,34.751708,0,1754660,output/sparsify/one.h5
+02_fsmp,2026-10-19T04:58:15Z,2026-10-19T04:59:51Z,95.740366,0,1304501,output/PE/one.pq
+03_reconstruct,2026-10-19T04:59:51Z,2026-10-19T05:02:52Z,181.584658,0,54885,output/tvE/one.h5
+TOTAL,2026-10-19T04:57:40Z,2026-10-19T05:02:52Z,312.104972,0,54885,output/tvE/one.h5

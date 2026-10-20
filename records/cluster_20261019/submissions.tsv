@@ -1,0 +1,5 @@
+submit_utc	id	job_id	partition	gpus	sjrng	beta_inv
+2026-10-19T04:41:21Z	one	1331825	gpu	1	0	0
+2026-10-19T04:45:21Z	one	1331839	gpu	1	0	0
+2026-10-19T04:56:49Z	one	1331852	gpu	1	1	0
+2026-10-19T05:06:01Z	one	1331864	gpu	1	0	0

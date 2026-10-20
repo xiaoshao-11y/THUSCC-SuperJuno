@@ -1,0 +1,25 @@
+[SUPERJUNO] sjrng C++ random backend active (/home/amazcuter/code/SCC/Preliminary_Round/SuperJUNO/cpp/_sjrng_core.so)
+LOCAL_PASS: structured i4 fields
+LOCAL_PASS: strided i4 requester
+LOCAL_PASS: reversed i4 requester
+LOCAL_PASS: i4 trials=0
+LOCAL_PASS: i4 trials=1
+LOCAL_PASS: i4 empty requester
+LOCAL_PASS: structured i8 fields
+LOCAL_PASS: strided i8 requester
+LOCAL_PASS: reversed i8 requester
+LOCAL_PASS: i8 trials=0
+LOCAL_PASS: i8 trials=1
+LOCAL_PASS: i8 empty requester
+LOCAL_PASS: large 64-bit identities
+LOCAL_PASS: large 64-bit identities in reverse; four threads
+LOCAL_PASS: alternate seed with same logical mapping
+LOCAL_PASS: 80 independent streams; normal rejection and tail paths
+LOCAL_PASS: local scheduler stubs only: first clean one submission reaches fake sbatch and records job
+LOCAL_PASS: local scheduler stubs only: active same-case job prevents archive and duplicate submission
+LOCAL_PASS: local scheduler stubs only: finished job permits resubmission and preserves old artifact
+LOCAL_PASS: local scheduler stubs only: duplicate case arguments rejected
+LOCAL_PASS: local scheduler stubs only: invalid case path rejected
+LOCAL_PASS: local scheduler stubs only: GPU count above two rejected
+LOCAL_PASS: local scheduler stubs only: unknown scheduler state rejected
+supervisor exit: 0

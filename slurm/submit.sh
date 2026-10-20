@@ -230,6 +230,15 @@ submit_one() {  # $1 = id; returns 0 only if the job was submitted
     if ! archive_id "$id"; then lock_release; return 1; fi
     local args=(run.slurm "$id")
     if [ -n "${SJ_PARTITION:-}" ]; then args=(--partition="$SJ_PARTITION" "${args[@]}"); fi
+    # SJ_NODE: pin the job to a node (sbatch -w). The stage-3 float32
+    # signature turned out to be node-independent, but pinning removes one
+    # variable if the comparator outcome is ever marginal.
+    if [ -n "${SJ_NODE:-}" ]; then args=(-w "$SJ_NODE" "${args[@]}"); fi
+    # SJ_CPUS: the stage-3 execution signature depends on the job's CPU
+    # count (empirically 2026-10-20: a gpu:2 job with the default 16 CPUs
+    # differs from the reference-matching 8-CPU context; forcing 8 restores
+    # it). Default 8 = the gpu:1 default the passing baselines ran under.
+    args=(--cpus-per-task="${SJ_CPUS:-8}" "${args[@]}")
     if [ "$SJ_GPUS" != "1" ]; then args=(--gres="gpu:$SJ_GPUS" "${args[@]}"); fi
     if ! job_id=$(sbatch --parsable "${args[@]}"); then
         echo "submit.sh: sbatch failed for id '$id'" >&2

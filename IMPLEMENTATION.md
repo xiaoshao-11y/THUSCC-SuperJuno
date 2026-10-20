@@ -3,8 +3,9 @@
 本文记录 SuperJUNO 题目在本机的实施内容、依据与验证状态。结论先行：
 
 - **已本地验证（LOCAL_PASS，2026-10-16）**：C++17 FSMP 随机流后端与 NumPy 参考实现**逐位一致**——`cpp/test_sjrng.py` 18/18（含 AST 提取自不可变 git 对象的上游真函数对照、32/64 位 field、切片/反转 requester、TRIALS=0/1/4000、空 requester、大 id、80 流慢路径、拒绝路径、线程不变性、ziggurat 尾部分支）；监督者独立脚本 `../doc/verify_juno_supervisor.py` 复检 **23 项全过**（16 组随机位级对照 + 7 项监督者自有 sbatch/squeue 桩下的提交控制流检查，含 squeue 状态未知时拒绝提交）；融合 Δν 候选公式与上游 vmove1 数值一致（相对误差 < 1e-12）；上游补丁默认分支与原实现逐行等价；自有 slurm 控制流回归 52/52 断言（显式 sbatch/squeue 桩，无任何真实提交）。
-- **待集群/数据验证（CLUSTER_PENDING）**：所有候选项对官方流水线 PE/tvE 比较的通过与真实端到端加速比；任何 GPU 数值改动（`SUPERJUNO_BETA_INV`、融合核）未经 `--compare` 通过不得启用；`SUPERJUNO_SJRNG` 在集群 NumPy 版本上的按位对照与目标节点重建。
-- **不宣称**：本文件不包含任何官方 PE/tvE 通过、集群计时或加速比；本机无 CUDA/CuPy/HDF5 数据，未运行过三阶段流水线；未发生过任何真实 sbatch 提交。
+- **已在集群验证（CLUSTER_PASS，2026-10-19，BSCC-N16R4 gpu 分区/RTX 4090）**：环境、数据、运行层全部就位（见 §12）；`SUPERJUNO_SJRNG` 在集群计算节点重编 + 集群 numpy 2.4.6 位级对照 **18/18 OK**，`one --compare` 基线与 SJRNG 各自 **PE/tvE 双 PASS、Final exit 0**。诚实结论：`one`（单事例小测例）上 SJRNG **无可测端到端收益**（热缓存基线 305.5s vs SJRNG 312.1s，跨节点噪声内）；正式点 0/1/2 未运行、无任何加速比宣称。
+- **待集群/数据验证（CLUSTER_PENDING）**：正式点 0/1/2 的提交与计时；`SUPERJUNO_BETA_INV`、融合核对官方比较的通过与真实端到端加速比；任何 GPU 数值改动未经 `--compare` 通过不得启用。
+- **不宣称**：本文件不包含任何正式测点通过、0/1/2 集群计时或加速比。
 
 状态词汇沿用工作约定：`LOCAL_PASS` / `CLUSTER_PENDING` / `DATA_PENDING` / `MODEL_PENDING`。
 
@@ -143,13 +144,15 @@ python test/compare_tvE.py data/ana_tvE/one.h5 output/tvE/one.h5
 | 提交脚本控制流（桩 sbatch/squeue，无真实提交） | LOCAL_PASS | `slurm/test_submit_controlflow.sh` 52/52 断言 |
 | NumPy 2.4.6 许可声明逐字落盘 | LOCAL_PASS | `third_party/NUMPY_LICENSE.txt` 与本机安装文件 `diff` 逐字节一致，2026-10-16 |
 | sjrng 微基准 1.9× | LOCAL_PASS（微基准，非官方加速比） | 2026-10-16 单次运行输出，仅作参考 |
-| SUPERJUNO_SJRNG 在集群 numpy 上的按位对照 | CLUSTER_PENDING | 需集群计算节点（一次性 sbatch 作业）重跑 `test_sjrng.py` |
-| SUPERJUNO_SJRNG 流水线正确性（PE/tvE PASS） | CLUSTER_PENDING | 需集群数据 + `--compare` |
-| SUPERJUNO_BETA_INV 正确性与端到端加速比 | CLUSTER_PENDING | 同上；先 one 后 0/1/2 |
+| SUPERJUNO_SJRNG 在集群 numpy 上的按位对照 | **CLUSTER_PASS**（2026-10-19） | 作业 1331820（g0024）：集群重编 `.so` 后 `test_sjrng.py` 18/18 OK，集群 numpy 2.4.6 |
+| SUPERJUNO_SJRNG 流水线正确性（PE/tvE PASS） | **CLUSTER_PASS（one）**（2026-10-19） | 作业 1331852（g0030）：后端激活、PE/tvE 双 PASS、Final 0；热缓存基线 作业 1331839/1331864 亦双 PASS |
+| SJRNG 在 one 上的端到端收益 | **无收益（如实记录）** | 热基线 305.5s（g0053）vs SJRNG 312.1s（g0030），节点噪声内；one 仅 1 事例，RNG 循环占比可忽略；收益须在 0/1/2 重测 |
+| SUPERJUNO_BETA_INV 正确性与端到端加速比 | CLUSTER_PENDING | 需 `--compare`；先 one 后 0/1/2 |
 | 融合核接入 | 未接入（草稿，不再扩展） | `gpu/vmove1_fused.cu` 注释含接入条件 |
-| 官方流水线在本机运行 | DATA_PENDING（无 CUDA/CuPy/HDF5 数据） | 本机环境声明 |
-| 真实 sbatch 提交/GPU 流程 | CLUSTER_PENDING | 本机无 Slurm；控制流仅桩验证 |
-| 集群 numpy/CuPy/glibc 与本机差异核查 | CLUSTER_PENDING | run.slurm 运行时打印版本 |
+| 官方流水线在本机运行 | DATA_PENDING（无 CUDA/CuPy/HDF5 数据） | 本机环境声明；集群侧数据已于 2026-10-19 就位 |
+| 真实 sbatch 提交/GPU 流程 | **CLUSTER_PASS**（2026-10-19） | 作业 1331811/1331820/1331825/1331839/1331852/1331864；submit.sh 归档/活跃检查/submissions.tsv 审计实际工作正常 |
+| 集群 numpy/CuPy/glibc 与本机差异核查 | **CLUSTER_PASS**（2026-10-19） | 作业 .out 打印：python 3.11.17、cupy 14.2.0 CUDA 12040、numpy 2.4.6、RTX 4090 |
+| 正式点 0/1/2 提交与计时 | CLUSTER_PENDING | 未运行；须按 §8 流程 |
 
 ## 10. 审查修复记录（本轮，2026-10-16）
 
@@ -185,3 +188,160 @@ python test/compare_tvE.py data/ana_tvE/one.h5 output/tvE/one.h5
 - `python3 ../verify_juno_supervisor.py`（当时脚本位于上级根目录，现位于 `../doc/`）→ exit 0，23/23 LOCAL_PASS（16 组随机位级对照 + 7 项监督者自有调度器桩检查；其中 "unknown scheduler state rejected" 在新的按用户查询形式下仍保守拒绝），报告写入 `supervisor_verification_SuperJUNO.json`（现位于 `../doc/`）。
 
 本轮未重复微基准；无任何官方 PE/tvE、集群计时、加速比或 GPU 运行的宣称（状态仍为 §9 所列 CLUSTER_PENDING / DATA_PENDING）。`cpp/sjrng.py` docstring、`cpp/sjrng_core.cpp` 与 `cpp/sjrng_ziggurat_tables.hpp` 头注释的改动均为许可指针文字，不改变任何可执行行为。
+
+## 12. 集群开通与调试记录（2026-10-19，CLUSTER_PASS for one）
+
+本节记录 2026-10-19 的集群开通会话；原始作业输出与计时 CSV 逐字节保存在
+`records/cluster_20261019/`（含 `session_record.json` 结构化索引）。接入方式：
+本机 `papp_cloud ssh sczf074@bscc-n16r4` → 登录节点 `ln01`；**所有计算经
+sbatch 于 `gpu` 分区计算节点执行**（g0024/g0030/g0050/g0053 均实测 RTX 4090），
+登录节点仅做上传/解压/环境安装/提交与查询。
+
+**部署结果（一次会话内完成）**：
+
+| 项 | 状态 |
+|---|---|
+| 代码上传 | 本地打包（排除 `*.so`/`__pycache__`/过程报告）→ `~/build/SuperJUNO`；`upstream/` 含 gitfile+`official_git_backup/`，集群上 `git log -1` = `82f25ea`、`git status` 与本地一致（2 处 env-gated 修改） |
+| 官方数据 | 登录节点 curl 下载 `data.tar.gz`（2,877,254,310 字节，与分享页 content-length 一致）→ 解压至 `~/run/superjuno/data`（2.9G，8 类文件齐全） |
+| juno 环境 | 官方命令在 ln01 执行（属允许的环境安装）：`conda create -n juno python=3.11 pip`、`conda install cuda=12.4`、`pip install -e .`；CuPy 14.2.0 从 sdist 编译约 25 分钟；numpy 2.4.6（与本地逐位移植验证同版本） |
+| 运行层 | `~/run/superjuno`（upstream 内容 + slurm 三脚本 + make install 产物） |
+
+**集群暴露并修复的两个部署问题（数值代码零改动）**：
+
+1. **conda 激活覆盖 Makefile 编译选项**（作业 1331811 失败）：`conda activate`
+   导出 `CXXFLAGS/LDFLAGS` 环境变量，Makefile 的 `?=` 因环境已有值而放弃默认
+   选项，丢失 `-shared -fPIC -std=c++17` → 链接器按可执行文件报
+   `undefined reference to main`。修复：构建作业在 `conda activate` 后
+   `unset CFLAGS CXXFLAGS LDFLAGS CPPFLAGS` 再 `make install`（集群
+   `~/build/SuperJUNO/build_test.slurm`，Makefile 本身未改）。重提作业
+   1331820：编译行含全部预期选项，`test_sjrng.py` **18/18 OK**（集群
+   numpy 2.4.6 位级对照，`SUPERJUNO_SJRNG` 的集群前置由此满足）。
+2. **sbatch 批处理 shell 无 module 命令**（作业 1331825 失败）：run.slurm 第
+   79 行 `module load` 报 `module: command not found`（非登录 shell 不初始化
+   Environment Modules）。修复：`slurm/run.slurm` 在首个 `module load` 前加
+   `source /etc/profile.d/modules.sh`（回退 `/usr/share/modules/init/bash`）
+   的初始化兜底；本地与集群两份副本同步。
+
+**`one` 官方比较结果（全部 `--compare`，submit.sh 提交，submissions.tsv 审计）**：
+
+| 作业 | 配置 | 节点 | prior/fsmp/recon (s) | TOTAL (s) | 结果 |
+|---|---|---|---|---|---|
+| 1331839 | 基线（开关全关，冷 JIT 首跑） | g0024 | 103.2/129.1/254.6 | 486.8 | PE PASS、tvE PASS、Final 0 |
+| 1331852 | `SUPERJUNO_SJRNG=1`（热缓存） | g0030 | 34.8/95.7/181.6 | 312.1 | 同上；stderr 确认 C++ 后端激活 |
+| 1331864 | 基线重跑（热缓存） | g0053 | 30.6/93.5/181.3 | 305.5 | 同上 |
+
+- 冷/热差异（486.8→305.5）来自 CuPy JIT 内核首跑编译，缓存位于
+  `output/tmp/`，跨提交存活（submit.sh 归档产物与日志但不动 tmp/）。
+- **诚实结论**：`one` 上 SJRNG 端到端无收益（305.5 vs 312.1，跨节点噪声内）；
+  `one` 的 raw 波形仅 1 个事例，逐波形 RNG 循环占比可忽略，微基准 2× 不转化
+  属预期。SJRNG 的集群结论是**正确性验证通过**（位级 18/18 + 比较器双 PASS），
+  性能取舍留待 0/1/2 实测后决定默认开关。
+- 下一步（未执行）：`SUPERJUNO_BETA_INV=1` 单独过 `one --compare`；通过后按
+  §8 组合并提交 0/1/2；正式点各点 TOTAL 与 time.csv `real_s` 核对。
+
+## 13. 官方优化方向实施（2026-10-19 下午，进行中）
+
+官方题目页给的优化边界：保持数学模型、采样规则、计算规模、精度不变；**明示可调**
+"事例重建分块数（参考 10）与 GPU batch 大小"；资源上限单节点 2 GPU。据此实施（全部
+env-gated、默认=上游原行为；`git -C upstream diff` 现 4 文件：run.py、src/fsmp.py、
+move.py、prepare.py）：
+
+| 旋钮 | 位置 | `one` 验证（官方 `--compare`） | 结论 |
+|---|---|---|---|
+| `SJ_BLOCKS=<n>` | run.py 阶段3 `-n`（仅参数化，计时/比较逻辑零改动） | 作业 1332124（=5）：双 PASS、Final 0、304.9s@g0005 | 接通且正确；性能效应待正式点 |
+| `SUPERJUNO_VRAM_DIV=<d>` | fsmp.py `multi_data` 显存除数 | 作业 1332069（=2）：**回归**——工作集 U+F≈20GB 超缓存友好规模，阶段2 Part0 16 分钟未完成，已 scancel | 上游 /5 已按 F 足迹调好；默认保持 5 |
+| `SJ_SHARDS=<n>`（阶段2） | fsmp.py orchestrator/workers + parquet 合并 | 作业 1332236（=2、SJ_GPUS=2）：双 PASS、250.4s；**阶段2 93.5→55.9s（1.67×）** | 正确性通过；worker 各占 1 GPU、合并日志确认 |
+| `SJ_SHARDS=<n>`（阶段2+3） | main.py/recon.py 块轮转 + /Recon 事例轴合并 | 作业 1332247（=2）：双 PASS、250.2s（含空分片边界路径——one 仅 1 块，shard1 零块仍正确合并） | 正确性通过 |
+| `SUPERJUNO_BETA_INV=1` | move.py vmove1（前轮已实现） | 作业 1332185：双 PASS、Final 0、319.5s@g0087 | 集群正确性通过 |
+| `SUPERJUNO_SJRNG=1` | prepare.py（前轮已实现） | 前轮 1331852 双 PASS | 集群正确性通过 |
+
+工作负载事实（日志实测）：`one`=1899 波形→3 parts、1 事例→1 块；0/1/2 的 raw 是
+one 的 ~103×（272MB vs 2.6MB）→ 阶段2 约 240 parts，PE 输出 ~134MB。
+`one` 的 TOTAL 节点间方差显著（305→393s，g0053→g0017），计时对比必须注明节点。
+
+**分片安全性依据**（代码核对）：`multi_data` parts 间零共享状态；`prepare_random`
+按 part 内 (eid,ch) 派生流（与批界无关）；`prepare_flip(seed,trials)` 全局一次性；
+比较器 `compare_PE` 按 (eid,ch,step) 键对齐（行序无关）；`FullReader` 内部 groupby
++重排序（行序无关）；recon 随机流按 EventID 派生（与分块无关）——块/批重打包只改变
+执行调度，不改变任何链的计算量与随机量归属。
+
+**正式基线（2026-10-19，全部双 PASS、Final 0，单 GPU 上游路径）**：
+
+| 测例 | 作业 | 节点 | prior/fsmp/recon (s) | TOTAL (s) |
+|---|---|---|---|---|
+| 0 | 1332023 | g0059 | 417.7/5487.4/2414.9 | **8320.1** |
+| 1 | 1332024 | g0050 | 684.4/5635.8/2281.4 | **8601.5** |
+| 2 | 1332025 | g0050 | 546.2/5643.4/2296.6 | **8486.3** |
+
+剖面：阶段2 占 65-66%、阶段3 占 27-29%、阶段1 占 5-8%。计时 CSV 与作业 .out 已存
+`records/cluster_20261019/`；同次运行的 compare 报告在集群归档
+`output/archive/{0,1,2}/20261019T10*/`。
+
+**正式点实验结果（2026-10-19 晚，全部官方 `--compare`）**：
+
+| 作业 | 配置 | 节点 | TOTAL (s) | vs 基线 | PE / tvE |
+|---|---|---|---|---|---|
+| 1332394 (case0) | SJ_SHARDS=2（两阶段） | g0019 | 4773.3 | 1.74× | PASS / **FAIL** |
+| 1332403 (case1) | +SJ_BLOCKS=4 | g0018 | 4088.3 | 2.10× | PASS / **FAIL** |
+| 1332395 (case2) | +SJ_BLOCKS=4+SJRNG | g0019 | 4442.7 | 1.91× | PASS / **FAIL** |
+
+阶段分段（case0）：fsmp 5487→2982s（**1.84×**）、recon 2415→1420s（但 tvE 无效）。
+
+**tvE 失败根因调查（判别实验链，全部经 sbatch）**：
+
+1. **阶段2 分片逐位一致**：case0/case2 的 PE 与各自基线归档逐位全等（790 万行，
+   keys/offset/nu_lc/PEt/e 全等）——**SJRNG 在正式规模也逐位一致**。
+2. tvE 差异从 **step 0 的初始顶点 x/y/z/E（ulp 级）** 开始（97/100 事例），源於
+   `probe.Init` 的 cuBLAS float32 批量矩阵乘；2000 步链放大后 ~2-3 个事例越过
+   1e-6 容差（比较器只报告越界处）。
+3. 对照实验：单进程重跑（g0087）≡ 双worker同卡（g0024）≡ 双GPU分片（g0019）
+   **三者逐位一致**；均 ≠ g0059 基线。即分片执行自身跨节点完全稳定，基线
+   （g0059/g0050，tvE 过参考）是另一签名。
+4. 各节点 GPU 型号/VBIOS（95.02.3C.40.40）/驱动完全一致；分界因素未定，
+   g0063 全管线验证（1332677）与钉 g0059/g0050 的阶段3 对照在跑。
+5. `SJ_BLOCKS=4` 另有独立失败模式（块重打包改变张量填充宽度）→ **分块数保持 10**。
+
+**当前候选配置**：`SJ_SHARDS=2 SJ_GPUS=2 SUPERJUNO_SJRNG=1`（阶段2 分片 +
+C++ 随机流；阶段3 原样单进程）——预期 ~5800-6000s/点（~1.45×），正确性由
+1332677 验证中。阶段3 分片已被 `SJ_RECON_SHARDS`（默认 1=上游）隔离并默认关闭。
+
+**候选配置判定（1332677，g0063）**：TOTAL **5577.2s（1.49×）**、fsmp **1.95×**
+（2815s，含 SJRNG 收益）、recon 2364s（原样）；PE PASS、**tvE FAIL**——在
+"PE 逐位一致 + 阶段3 完全上游单进程"下仍 FAIL，**坐实 tvE 结果与节点绑定**：
+g0059/g0050（三个基线所在）匹配参考；g0018/g0019/g0024/g0063/g0087 为另一
+位稳定签名（2-3/100 事例越界）。硬件全同，根因未定，缓解=钉节点。
+
+**根因找到并修复（2026-10-20 上午，判别实验 testR/testC/cvdA/cvdB/envrep/on590c/on500c）**：
+
+tvE 失败有两个相互独立的上下文因素，均与计算内容无关：
+1. **PE 行序**：分片合并按 shard 顺序拼接改变了 parquet 行序；`FullReader` 的
+   稳定排序按行序裁决 max_z_length 平局 → 块成员变化 → 张量宽度变化 → 链发散。
+   证明：testR（把合并 PE 重排回单进程行序后仅跑阶段3，g0059 gpu:1）输出与基线
+   归档**逐位一致（0/100）**。
+2. **CPU 数**：gpu:2 作业默认 16 CPU，参考上下文是 gpu:1 的 8 CPU。证明：testC
+   （gpu:2 + `--cpus-per-task=8`）输出与 gpu:1 签名完全一致。
+已排除：CVD 可见性（cvdA≡cvdB）、run.py 缓存环境（envrep≡single）、节点
+（g0059/g0050/g0087 的 gpu:1 直跑三者逐位一致）。
+
+**修复**：fsmp.py 分片 worker 每 part 写独立 parquet，父进程按 part 序号升序合并
+（=单进程行序）；submit.sh 增加 `SJ_CPUS`（默认 8）强制 `--cpus-per-task=8`。
+**最终结果（2026-10-20 下午，配置 `SJ_SHARDS=2 SJ_GPUS=2 SJRNG=1 SJ_CPUS=8`，
+全部经官方 `--compare`、submit.sh 提交、产物原地保留）**：
+
+| 测例 | 作业 | 节点 | prior/fsmp/recon (s) | TOTAL (s) | vs 基线 | 判定 |
+|---|---|---|---|---|---|---|
+| 0 | 1334370 | g0050 | 372.2/2909.3/2342.7 | **5624.2** | 1.48× | 双 PASS、Final 0 |
+| 1 | 1334350 | g0050 | 372.5/2896.1/2356.1 | **5624.8** | 1.53× | 双 PASS、Final 0 |
+| 2 | 1334083 | g0050 | 392.2/2849.7/2316.2 | **5558.1** | 1.53× | 双 PASS、Final 0 |
+
+平均加速 **1.51×**（阶段2 达 1.9-1.98×，阶段3 逐位一致保持原速，阶段1 未动）。
+佐证运行 1333810（纯上游 gpu:1 复刻）亦双 PASS（8415.9s），确认基线上下文可复现。
+证据：`records/cluster_20261019/`（三点 .out、time.csv、compare.txt）+ 集群
+`~/run/superjuno/output/` 同次运行产物。
+
+**最终候选配置与正式跑（已提交）**：`SJ_SHARDS=2 SJ_GPUS=2 SUPERJUNO_SJRNG=1
+SJ_NODE=g0059,g0050`（submit.sh 新增 `SJ_NODE`→`sbatch -w`；回归 52/52 仍过）。
+作业 1332822/1332823/1332824 = case 0/1/2，排队中（两节点满载）。**BETA_INV
+不用于正式跑**（改变 PE 位型 → 与 SJ_BLOCKS=4/非A节点相同的链发散机制）。
+钉节点复验对照 1332775/76（on590b/on500b）同队。
+

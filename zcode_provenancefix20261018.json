@@ -1,0 +1,10 @@
+{
+  "problem": "SuperJUNO",
+  "task": "ZCODE_FIX_PROVENANCE_20261018.md",
+  "log": "zcode_provenancefix20261018.log",
+  "started_at": "2026-10-18T22:14:11.475810+08:00",
+  "state": "finished",
+  "pid": 253569,
+  "exit_code": 0,
+  "finished_at": "2026-10-18T22:22:54.304140+08:00"
+}

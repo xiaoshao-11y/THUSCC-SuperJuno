@@ -1,0 +1,5 @@
+Miniforge3-24.11 loaded successful
+/data/run01/sczf074/.conda/envs/juno/bin/x86_64-conda-linux-gnu-ld: /data/run01/sczf074/.conda/envs/juno/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/Scrt1.o: in function `_start':
+(.text+0x1b): undefined reference to `main'
+collect2: error: ld returned 1 exit status
+make: *** [Makefile:31: cpp/_sjrng_core.so] Error 1

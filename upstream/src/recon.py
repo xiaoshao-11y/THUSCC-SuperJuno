@@ -297,9 +297,20 @@ def Reconstruction(
     max_vertices,
     recon_dataset,
     random_seed=0,
+    shard_count=1,
+    shard_index=0,
 ):
-    """Run reconstruction for all event blocks."""
+    """Run reconstruction for all event blocks.
+
+    [SUPERJUNO-OPT] shard_count/shard_index are execution-scheduling only:
+    blocks are independent (random streams are keyed by EventID), so a
+    worker that runs only blocks with ``number % shard_count ==
+    shard_index`` produces exactly the same chains. The default 1/0 keeps
+    the exact upstream behavior. The dataset is created for the full event
+    count and resized down to the worker's own events at the end.
+    """
     event_offset = 0
+    block_number = 0
 
     def reconstruct_block(block):
         """Reconstruct one event block."""
@@ -509,4 +520,11 @@ def Reconstruction(
             break
         # Release the reader to prefetch the next block.
         sync_queue.put(None)
-        event_offset += reconstruct_block(block)
+        own_block = block_number % shard_count == shard_index
+        block_number += 1
+        if own_block:
+            event_offset += reconstruct_block(block)
+
+    if event_offset < recon_dataset.shape[1]:
+        recon_dataset.resize(event_offset, axis=1)
+    return event_offset

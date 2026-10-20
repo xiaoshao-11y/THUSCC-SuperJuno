@@ -1,0 +1,108 @@
+python3 cpp/test_sjrng.py
+test_field_widths_views_and_orders (__main__.TestAgainstExtractedUpstream.test_field_widths_views_and_orders) ... [SUPERJUNO] sjrng C++ random backend active (/home/amazcuter/code/SCC/Preliminary_Round/SuperJUNO/cpp/_sjrng_core.so)
+ok
+test_large_identities_and_alternate_seed (__main__.TestAgainstExtractedUpstream.test_large_identities_and_alternate_seed) ... ok
+test_many_streams_hit_normal_slow_paths (__main__.TestAgainstExtractedUpstream.test_many_streams_hit_normal_slow_paths) ... ok
+test_pipeline_shaped_two_field_view (__main__.TestAgainstExtractedUpstream.test_pipeline_shaped_two_field_view) ... ok
+test_float_fields_rejected (__main__.TestRequesterValidation.test_float_fields_rejected) ... ok
+test_negative_ids_rejected (__main__.TestRequesterValidation.test_negative_ids_rejected) ... ok
+test_non_integer_scalar_arguments_rejected (__main__.TestRequesterValidation.test_non_integer_scalar_arguments_rejected) ... ok
+test_uint64_above_int64_max_rejected (__main__.TestRequesterValidation.test_uint64_above_int64_max_rejected) ... ok
+test_uint64_in_range_accepted (__main__.TestRequesterValidation.test_uint64_in_range_accepted) ... ok
+test_accepts_are_log_of_uniform (__main__.TestSjrngBitExact.test_accepts_are_log_of_uniform) ... ok
+test_alternate_seeds (__main__.TestSjrngBitExact.test_alternate_seeds) ... ok
+test_boundary_ids (__main__.TestSjrngBitExact.test_boundary_ids) ... ok
+test_official_seed_small (__main__.TestSjrngBitExact.test_official_seed_small) ... ok
+test_official_seed_trials_4000 (__main__.TestSjrngBitExact.test_official_seed_trials_4000) ... ok
+test_thread_count_invariance (__main__.TestSjrngBitExact.test_thread_count_invariance) ... ok
+test_trials_one_and_empty (__main__.TestSjrngBitExact.test_trials_one_and_empty) ... ok
+test_ziggurat_branches_exercised (__main__.TestSjrngBitExact.test_ziggurat_branches_exercised) ... ok
+test_benchmark (__main__.TestSjrngMicroBenchmark.test_benchmark) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 21.712s
+
+OK
+[info] sjrng_core 1.0 (numpy Generator/PCG64/SeedSequence + ziggurat normal, bit-exact port)
+[info] numpy 2.4.6
+[micro] prepare_random streams=5000 trials=4000: numpy loop 8.618 s, C++ 6.055 s (1.4x, LOCAL micro-benchmark, not official)
+python3 cpp/test_fused_formula.py
+test_minimum_width (__main__.TestFusedFormula.test_minimum_width) ... /home/amazcuter/code/SCC/Preliminary_Round/SuperJUNO/cpp/test_fused_formula.py:57: RuntimeWarning: invalid value encountered in log
+  Δν = Δν + 0.5 * np.log(stable_det(beta) * stable_det(fsig2s_inv))
+ok
+test_near_singular_beta_inv (__main__.TestFusedFormula.test_near_singular_beta_inv) ... ok
+test_random_typical (__main__.TestFusedFormula.test_random_typical) ... ok
+test_wide (__main__.TestFusedFormula.test_wide) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.280s
+
+OK
+install -m 0644 cpp/_sjrng_core.so upstream/src/_sjrng_core.so
+install -m 0644 cpp/sjrng.py upstream/src/sjrng.py
+python3 cpp/test_install.py
+test_import_from_upstream_src (__main__.TestInstalledSeam.test_import_from_upstream_src) ... ok
+test_patched_files_default_branch_intact (__main__.TestInstalledSeam.test_patched_files_default_branch_intact) ... ok
+test_pipeline_shaped_requester (__main__.TestInstalledSeam.test_pipeline_shaped_requester) ... [SUPERJUNO] sjrng C++ random backend active (/home/amazcuter/code/SCC/Preliminary_Round/SuperJUNO/upstream/src/_sjrng_core.so)
+ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.090s
+
+OK
+bash slurm/test_submit_controlflow.sh
+ok   - clean first submission of one exits 0
+ok   - submissions.tsv recorded
+ok   - submissions.tsv has header + 1 row (job 100)
+ok   - output/logs pre-created for Slurm stdout
+ok   - lock released after success
+ok   - active same-id submission refused
+ok   - active job: existing product NOT archived
+ok   - active job: no new sbatch
+ok   - finished id resubmits and archives
+ok   - old product moved out of PE/
+ok   - old product preserved in output/archive/one/
+ok   - duplicate ids (one one) rejected
+ok   - duplicates: no sbatch
+ok   - invalid id ../../x rejected
+ok   - invalid id: output/ never created
+ok   - SJ_GPUS=3 rejected
+ok   - SJ_GPUS=3: output/ never created
+ok   - missing data inputs refused
+ok   - missing data: no sbatch
+ok   - SJ_SKIP_DATA_CHECK=1 overrides for local tests
+ok   - mixed invocation with one active id exits nonzero
+ok   - non-active id (1) still submitted exactly once
+ok   - id 1 recorded in submissions.tsv
+ok   - resubmission with colliding archive timestamp
+ok   - archive dirs kept distinct under collision
+ok   - tvE products preserved in archive
+ok   - scored ids without prior one refused
+ok   - purged historical ids allow archiving re-submission
+ok   - purged ids: re-submitted exactly once
+ok   - purged ids: previous artifact still archived
+ok   - job recorded with parsable suffix (111;gpu-a)
+ok   - active job refused despite ;cluster suffix in record
+ok   - suffix case: no new sbatch while active
+ok   - suffix-recorded id re-submits after job leaves queue
+ok   - squeue failure conservatively refuses
+ok   - squeue failure: product NOT archived
+ok   - squeue failure: no sbatch
+ok   - no squeue -j anywhere in the run
+ok   - squeue queried via per-user listing (-u <user> -o %A)
+ok   - run.slurm without argument -> 99
+ok   - run.slurm refusal created no output/
+ok   - run.slurm invalid id -> 99
+ok   - run.slurm refusal created no output/
+ok   - run.slurm outside Slurm -> 97
+ok   - run.slurm refusal created no output/
+ok   - run.slurm multi-node -> 97
+ok   - run.slurm refusal created no output/
+ok   - run.slurm 3 GPUs -> 97
+ok   - run.slurm refusal created no output/
+ok   - run.slurm valid env passes validation (local stop at module load, exit 127)
+ok   - run.slurm valid env created output/logs
+ok   - run.slurm stale products -> 98
+
+control-flow regression: 52 passed, 0 failed (stub sbatch/squeue only; no cluster contacted)
+make test exit: 0

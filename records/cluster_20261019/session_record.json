@@ -1,0 +1,471 @@
+{
+  "session": "SuperJUNO cluster bring-up and debug",
+  "date": "2026-10-19",
+  "operator": "zcode (local machine only; agent never runs remotely)",
+  "route": "papp_cloud ssh sczf074@bscc-n16r4 -> login node ln01; compute only via sbatch on partition gpu (RTX 4090)",
+  "steps": {
+    "upload": {
+      "method": "local tarball (excl *.so, __pycache__, zcode_*/ZCODE_*/supervisor_* reports) -> papp_cloud scp -> ~/build/SuperJUNO",
+      "size_bytes": 594886
+    },
+    "data": {
+      "source": "official share https://cloud.tsinghua.edu.cn/d/0bc5df5078e84dca81a2/ file data.tar.gz",
+      "direct_url": "https://cloud.tsinghua.edu.cn/d/0bc5df5078e84dca81a2/files/?p=%2Fdata.tar.gz&dl=1",
+      "size_bytes": 2877254310,
+      "downloaded_on": "ln01 via curl (file management)",
+      "extracted_to": "~/run/superjuno/data (2.9G; raw/ana_PE/ana_tvE for one,0,1,2 + 5 shared inputs; ana_PE one.pq etc.)",
+      "tar_prefix": "data/"
+    },
+    "environment": {
+      "created_on": "ln01 (officially allowed: environment installation)",
+      "commands": "module load miniforge3/24.11; conda create -y -n juno python=3.11 pip; conda install -y cuda=12.4; pip install -e . (in ~/run/superjuno)",
+      "log": "~/run/env_setup.log, final marker ENV_SETUP_DONE_0",
+      "versions": {
+        "python": "3.11.17",
+        "cuda": "conda cuda 12.4 (nvcc Build cuda_12.4.r12.4/compiler.34097967_0)",
+        "cupy": "14.2.0 (built from PyPI sdist on ln01; runtime CUDA 12040)",
+        "numpy": "2.4.6 (same version as the local bit-exact port verification)",
+        "scipy": "1.17.1",
+        "h5py": "3.16.0",
+        "pandas": "3.0.6",
+        "pyarrow": "26.0.0",
+        "hdf5plugin": "7.1.0"
+      }
+    }
+  },
+  "issues_found_and_fixed": [
+    {
+      "issue": "make install failed on compute node: undefined reference to main (link tried to build an executable)",
+      "job": 1331811,
+      "cause": "conda activate exports CXXFLAGS/LDFLAGS; the Makefile uses ?= so conda's flags replaced ours and dropped -shared/-fPIC/-std=c++17",
+      "fix": "unset CFLAGS CXXFLAGS LDFLAGS CPPFLAGS after conda activate in the build job (build_test.slurm on cluster); Makefile unchanged",
+      "evidence": "build_test_1331811.err"
+    },
+    {
+      "issue": "run.slurm died immediately in sbatch: module: command not found (line 79)",
+      "job": 1331825,
+      "cause": "sbatch batch shells are non-login; Environment Modules is not initialized there",
+      "fix": "run.slurm now sources /etc/profile.d/modules.sh (fallback /usr/share/modules/init/bash) before the first module load; patched in SuperJUNO/slurm/run.slurm (local) and both cluster copies",
+      "evidence": "superjuno-1331825.out not kept locally; cluster path ~/run/superjuno/output/logs/superjuno-1331825.out"
+    }
+  ],
+  "runs": [
+    {
+      "purpose": "rebuild .so on compute node + numpy bit-level comparison",
+      "job_id": 1331820,
+      "node": "g0024",
+      "script": "~/build/SuperJUNO/build_test.slurm (created this session, kept on cluster)",
+      "commands": "make install && python3 cpp/test_sjrng.py (juno env)",
+      "result": "PASS: compiled with the intended flags (-std=c++17 -O2 -fPIC -fno-fast-math -pthread -shared); test_sjrng.py 18/18 OK against cluster numpy 2.4.6; BUILD_TEST_OK",
+      "evidence": [
+        "build_test_1331820.out",
+        "build_test_1331820.err"
+      ]
+    },
+    {
+      "purpose": "baseline one --compare, opt-in switches OFF",
+      "job_id": 1331839,
+      "node": "g0024",
+      "result": "PASS: Pipeline exit 0; PE PASS; tvE PASS (atol=rtol=1e-6); Final exit code 0",
+      "total_s": 486.848519,
+      "timing_csv": "one-20261019T044508Z-2164931.time.csv",
+      "stage_real_s": {
+        "01_fsmp_prior": 103.176377,
+        "02_fsmp": 129.060519,
+        "03_reconstruct": 254.592537
+      },
+      "note": "first pipeline run ever on the account: includes cold CuPy JIT kernel compilation in output/tmp",
+      "evidence": [
+        "superjuno-1331839.out",
+        "one-20261019T044508Z-2164931.time.csv"
+      ]
+    },
+    {
+      "purpose": "opt-in candidate SUPERJUNO_SJRNG=1, one --compare",
+      "job_id": 1331852,
+      "node": "g0030",
+      "result": "PASS: C++ backend confirmed active (stderr line '[SUPERJUNO] sjrng C++ random backend active'); Pipeline exit 0; PE PASS; tvE PASS; Final exit code 0",
+      "total_s": 312.104972,
+      "timing_csv": "one-20261019T045740Z-212648.time.csv",
+      "stage_real_s": {
+        "01_fsmp_prior": 34.751708,
+        "02_fsmp": 95.740366,
+        "03_reconstruct": 181.584658
+      },
+      "note": "warm CuPy JIT cache; different node than the cold baseline; the two TOTALs are NOT a valid speedup pair",
+      "evidence": [
+        "superjuno-1331852.out",
+        "one-20261019T045740Z-212648.time.csv"
+      ]
+    },
+    {
+      "purpose": "warm-cache baseline rerun, switches OFF (fair control for the SJRNG number)",
+      "job_id": 1331864,
+      "node": "g0053",
+      "result": "PASS: Pipeline exit 0; PE PASS; tvE PASS; Final exit code 0",
+      "total_s": 305.510193,
+      "timing_csv": "one-20261019T050508Z-1004547.time.csv",
+      "stage_real_s": {
+        "01_fsmp_prior": 30.606043,
+        "02_fsmp": 93.536081,
+        "03_reconstruct": 181.346844
+      },
+      "conclusion": "warm-vs-warm on one: 305.5 s baseline vs 312.1 s SJRNG on adjacent nodes; per-stage differences are within node/run noise. SUPERJUNO_SJRNG is correctness-validated on the cluster (bit-level 18/18 + comparator PASS) but shows NO end-to-end gain on the tiny example case one (its raw waveform has a single event, so the per-waveform RNG loop is negligible there). Any real benefit must be measured on the scored cases 0/1/2; no speedup is claimed.",
+      "evidence": [
+        "superjuno-1331864.out",
+        "one-20261019T050508Z-1004547.time.csv"
+      ]
+    }
+  ],
+  "caches": "CuPy/CUDA caches persist in ~/run/superjuno/output/tmp across submissions (submit.sh archives artifacts and logs but not tmp/)",
+  "audit": "output/logs/submissions.tsv records all four submissions with switch values (see submissions.tsv copy)",
+  "no_claims": "no official 0/1/2 scored runs yet; no speedup claimed; cross-node/cold-warm totals not comparable",
+  "afternoon_optimization_session": {
+    "date": "2026-10-19 afternoon",
+    "official_levers": "task page allows adjusting event-block count and GPU batch size; max 2 GPUs per run; math/sampling/scale/precision fixed",
+    "knobs_implemented": {
+      "SJ_BLOCKS": "run.py stage-3 -n parameterized via env (default 10 = upstream); timing logic untouched",
+      "SUPERJUNO_VRAM_DIV": "fsmp.py multi_data VRAM divisor via env (default 5 = upstream)",
+      "SJ_SHARDS": "both stages: orchestrator spawns N worker processes (round-robin parts/blocks, one GPU each), parquet/h5-merges outputs; default 1 = upstream single process"
+    },
+    "one_validations": [
+      {
+        "job": 1332124,
+        "config": "SJ_BLOCKS=5",
+        "node": "g0005",
+        "total_s": 304.937596,
+        "result": "PE PASS tvE PASS Final 0"
+      },
+      {
+        "job": 1332069,
+        "config": "SUPERJUNO_VRAM_DIV=2",
+        "node": "g0019",
+        "result": "REGRESSION cancelled: U+F working set ~20GB collapsed kernel throughput; part0 unfinished after 16 min"
+      },
+      {
+        "job": 1332185,
+        "config": "SUPERJUNO_BETA_INV=1",
+        "node": "g0087",
+        "total_s": 319.467138,
+        "result": "PE PASS tvE PASS Final 0"
+      },
+      {
+        "job": 1332236,
+        "config": "SJ_SHARDS=2 (stage 2 only code at the time)",
+        "node": "g0087 x2 GPU",
+        "total_s": 250.362671,
+        "stages_s": {
+          "prior": 8.41,
+          "fsmp": 55.88,
+          "recon": 186.05
+        },
+        "result": "PE PASS tvE PASS Final 0; stage2 93.5->55.9s vs warm baseline"
+      },
+      {
+        "job": 1332247,
+        "config": "SJ_SHARDS=2 both stages",
+        "node": "g0059 x2 GPU",
+        "total_s": 250.207114,
+        "result": "PE PASS tvE PASS Final 0; validates stage-3 sharding incl. empty-shard path"
+      }
+    ],
+    "scored_baselines": {
+      "config": "all switches off (upstream path), 1 GPU, jobs 1332023/1332024/1332025",
+      "results": [
+        {
+          "case": "0",
+          "job": 1332023,
+          "node": "g0059",
+          "prior_s": 417.69,
+          "fsmp_s": 5487.42,
+          "recon_s": 2414.92,
+          "total_s": 8320.09,
+          "compare": "PE PASS tvE PASS Final 0",
+          "timing_csv": "0-20261019T074033Z-3900437.time.csv"
+        },
+        {
+          "case": "1",
+          "job": 1332024,
+          "node": "g0050",
+          "prior_s": 684.36,
+          "fsmp_s": 5635.75,
+          "recon_s": 2281.37,
+          "total_s": 8601.53,
+          "compare": "PE PASS tvE PASS Final 0",
+          "timing_csv": "1-20261019T073832Z-3140893.time.csv"
+        },
+        {
+          "case": "2",
+          "job": 1332025,
+          "node": "g0050",
+          "prior_s": 546.18,
+          "fsmp_s": 5643.39,
+          "recon_s": 2296.63,
+          "total_s": 8486.26,
+          "compare": "PE PASS tvE PASS Final 0",
+          "timing_csv": "2-20261019T073832Z-3140892.time.csv"
+        }
+      ],
+      "profile": "stage2 65-66%, stage3 27-29%, stage1 5-8%"
+    },
+    "scored_experiments_submitted": [
+      {
+        "job": 1332394,
+        "case": "0",
+        "config": "SJ_SHARDS=2 SJ_GPUS=2",
+        "purpose": "pure sharding A/B vs baseline 0",
+        "status": "PENDING"
+      },
+      {
+        "job": 1332403,
+        "case": "1",
+        "config": "SJ_SHARDS=2 SJ_GPUS=2 SJ_BLOCKS=4",
+        "purpose": "sharding + fewer event blocks",
+        "status": "PENDING"
+      },
+      {
+        "job": 1332395,
+        "case": "2",
+        "config": "SJ_SHARDS=2 SJ_GPUS=2 SJ_BLOCKS=4 SUPERJUNO_SJRNG=1",
+        "purpose": "kitchen-sink combo",
+        "status": "PENDING"
+      }
+    ],
+    "workload_facts": "one=1899 waveforms/3 parts/1 event; scored cases ~103x raw size (272MB), stage2 ~240 parts, PE outputs ~134MB",
+    "session_notes": "papp_cloud token expired ~16:50 (E304), user re-authenticated; cluster jobs unaffected (Slurm autonomous)"
+  },
+  "scored_experiments_results": {
+    "pipelines": [
+      {
+        "job": 1332394,
+        "case": "0",
+        "config": "SJ_SHARDS=2 SJ_GPUS=2 (pure sharding)",
+        "node": "g0019",
+        "stages_s": {
+          "prior": 371.29,
+          "fsmp": 2982.4,
+          "recon": 1419.6
+        },
+        "total_s": 4773.35,
+        "speedup_vs_baseline": 1.74,
+        "compare": "PE PASS / tvE FAIL (Final 1)"
+      },
+      {
+        "job": 1332403,
+        "case": "1",
+        "config": "SJ_SHARDS=2 SJ_GPUS=2 SJ_BLOCKS=4",
+        "node": "g0018",
+        "stages_s": {
+          "prior": 387.38,
+          "fsmp": 2796.6,
+          "recon": 904.3
+        },
+        "total_s": 4088.34,
+        "speedup_vs_baseline": 2.1,
+        "compare": "PE PASS / tvE FAIL (Final 1)"
+      },
+      {
+        "job": 1332395,
+        "case": "2",
+        "config": "SJ_SHARDS=2 SJ_GPUS=2 SJ_BLOCKS=4 SUPERJUNO_SJRNG=1",
+        "node": "g0019",
+        "stages_s": {
+          "prior": 575.89,
+          "fsmp": 2976.87,
+          "recon": 889.85
+        },
+        "total_s": 4442.66,
+        "speedup_vs_baseline": 1.91,
+        "compare": "PE PASS / tvE FAIL (Final 1)"
+      }
+    ],
+    "tvE_failure_analysis": {
+      "pattern": "all three scored runs fail tvE; PE comparisons PASS at full scale (7.9M rows)",
+      "pe_bitwise_check_case0": "baseline archive vs sharded PE: keys identical, offset/nu_lc exact, PEt/e bitwise equal, q equal up to NaN representation -> STAGE-2 SHARDING IS BIT-EXACT AT FULL SCALE",
+      "tve_bitwise_check_case0": "97/100 events differ from step 0; differing fields are the INITIAL vertex x/y/z/E at float32 ulp level (probe.Init cuBLAS batched matmul); chains then amplify ulp diffs until ~2 events cross the 1e-6 tolerance mid-chain (first reported at step 1185)",
+      "hypothesis_under_test": "stage-3 float32 cuBLAS GEMM picks different kernels on different nodes (e.g. RTX 4090 vs 4090D SM count) or different process layout; stage-2 float64 custom kernels are unaffected (bit-exact across nodes/GPUs). SJ_BLOCKS repacking additionally changes padded tensor widths (its own failure mode, case1).",
+      "controls_submitted": [
+        {
+          "job": 1332601,
+          "mode": "stage-3 only, single process, input=output/PE/0.pq",
+          "purpose": "is current default path bit-reproducible vs archived baseline (cross-node)"
+        },
+        {
+          "job": 1332602,
+          "mode": "stage-3 only, SJ_SHARDS=2 SJ_SHARD_GPUS=0,0 (both workers one GPU)",
+          "purpose": "isolate process-split effect from GPU difference"
+        }
+      ]
+    }
+  },
+  "stage3_divergence_investigation": {
+    "summary": "Stage-2 sharding is bit-exact at full scale and SAFE. Stage-3 (reconstruction) outputs depend on the execution context at float32-ulp level; 2000-step chains amplify this until ~2-3/100 events cross the 1e-6 comparator tolerance -> tvE FAIL. The sharded execution itself is perfectly bit-stable; the divergence is vs the single-process baseline AND is node-dependent.",
+    "evidence_chain": [
+      "case0 PE: baseline archive vs sharded-2GPU run: 7.9M rows, keys/offset/nu_lc/PEt/e all bitwise equal (q equal up to NaN representation) -> stage-2 sharding bit-exact; SUPERJUNO_SJRNG also bit-exact at scale (case2 PE)",
+      "case0 tvE: sharded vs baseline: 97/100 events differ from step 0 in initial vertex x/y/z/E at ulp level (probe.Init cuBLAS float32 batched matmul); comparator reports only the 2 events that cross tolerance mid-chain (EventID 7 from step ~1185, EventID 2 Likelihood step 1725)",
+      "control A: stage-3 only, single process, g0087: differs from g0059 baseline with the SAME 97/100-from-step-0 pattern",
+      "control B: stage-3 only, 2 workers BOTH on GPU0, g0024: bit-identical to control A (0/100) and to the 2-GPU sharded run on g0019 (0/100)",
+      "therefore: single(g0087) == shard00(g0024) == 2gpu(g0019) [signature B]; baseline(g0059) and cases1/2 baselines(g0050) passed the official comparator [signature A nodes]",
+      "all probed nodes: identical RTX 4090, VBIOS 95.02.3C.40.40, driver 550.135 -> hardware uniform; differentiator not yet identified",
+      "SJ_BLOCKS=4 additionally repacks blocks (padded tensor widths change) -> its own tvE failure mode (case1); reverted to default 10"
+    ],
+    "implications": [
+      "KEEP: stage-2 sharding (SJ_SHARDS) - bit-exact, ~1.85x on stage 2",
+      "DROP: stage-3 sharding and SJ_BLOCKS changes (SJ_RECON_SHARDS knob added, default 1 = upstream)",
+      "OPEN: whether tvE PASS depends on node class; discriminators in flight: full pipeline on g0063 (1332677) and pinned stage-3-only controls on g0059/g0050 (on5900/on5000)",
+      "if node-dependent: official scored runs must pin the node class that reproduces the reference signature (sbatch -w), pending identification"
+    ]
+  },
+  "final_candidate_and_node_pinning": {
+    "validation_1332677": {
+      "config": "SJ_SHARDS=2 SJ_GPUS=2 SUPERJUNO_SJRNG=1 (stage-2 sharding only; stage-3 upstream single-process via new SJ_RECON_SHARDS default 1)",
+      "node": "g0063",
+      "stages_s": {
+        "prior": 397.58,
+        "fsmp": 2815.16,
+        "recon": 2364.44
+      },
+      "total_s": 5577.24,
+      "speedup_vs_case0_baseline": 1.49,
+      "stage2_speedup": 1.95,
+      "compare": "PE PASS / tvE FAIL (Final 1)"
+    },
+    "node_dependence_conclusion": "The candidate config's tvE failure on g0063 with a bit-exact PE input and the untouched single-process stage 3 proves the comparator outcome is NODE-dependent: g0059/g0050 (all three baselines) produce reference-matching results; g0018/g0019/g0024/g0063/g0087 produce a different bit-stable signature that crosses the 1e-6 tolerance for ~2-3/100 events. Hardware (RTX 4090, VBIOS 95.02.3C.40.40, driver 550.135) is identical across nodes; root cause unidentified; mitigation is node pinning.",
+    "official_candidate_runs": [
+      {
+        "job": 1332822,
+        "case": "0",
+        "config": "SJ_SHARDS=2 SJ_GPUS=2 SJRNG=1 SJ_NODE=g0059,g0050",
+        "status": "PENDING at submission"
+      },
+      {
+        "job": 1332823,
+        "case": "1",
+        "same": true,
+        "status": "PENDING"
+      },
+      {
+        "job": 1332824,
+        "case": "2",
+        "same": true,
+        "status": "PENDING"
+      }
+    ],
+    "pinned_controls_still_queued": {
+      "jobs": [
+        1332775,
+        1332776
+      ],
+      "purpose": "confirm g0059/g0050 reproduce signature A on rerun"
+    },
+    "beta_inv_decision": "OFF for official runs: it perturbs PE values at ulp level, the same mechanism that made SJ_BLOCKS=4 and non-A-node stage-3 runs fail tvE",
+    "submit_sh_update": "SJ_NODE env adds sbatch -w (node pinning); control-flow regression 52/52 still passes"
+  },
+  "overnight_official_runs": {
+    "result": "ALL THREE FAILED tvE even pinned to g0059/g0050 — node-pinning theory disproved",
+    "runs": [
+      {
+        "job": 1332822,
+        "case": "0",
+        "node": "g0050",
+        "total_s": 5577.48,
+        "compare": "PE PASS / tvE FAIL Final 1"
+      },
+      {
+        "job": 1332823,
+        "case": "1",
+        "node": "g0050",
+        "total_s": 5582.48,
+        "compare": "PE PASS / tvE FAIL Final 1"
+      },
+      {
+        "job": 1332824,
+        "case": "2",
+        "node": "g0059",
+        "total_s": 5528.45,
+        "compare": "PE PASS / tvE FAIL Final 1"
+      }
+    ],
+    "performance_confirmed": "5528-5582s per case, ~1.50-1.55x vs baselines, stable across cases/nodes",
+    "remaining_difference_vs_baseline": "candidate jobs hold gpu:2 (stage-3 process sees CUDA_VISIBLE_DEVICES=0,1); baseline jobs held gpu:1 (single-value CVD)",
+    "discriminators_submitted": {
+      "cvd_matrix": "job 1333102 on g0059 gpu:2: variant A CVD=0,1 (replicate failure) then variant B CVD=0 (single-visibility hypothesis) on case-2 PE; compare vs baseline archive (A-signature) and 1332824 output (B-signature)",
+      "gpu1_controls": "jobs 1333103/1333104 on g0059/g0050 gpu:1 stage-3-only (earlier attempts 1332775/76 died on PE-archive race)"
+    }
+  },
+  "root_cause_found_20261020": {
+    "summary": "Two independent context factors made every modified run fail tvE while the baselines passed. Both are now identified and fixed; the fixes reproduce the baseline output bit-for-bit.",
+    "factor_1_pe_row_order": {
+      "mechanism": "The sharded stage-2 merge concatenated parquet rows in shard order, changing the PE row order. FullReader's stable sort (sort_values on max_z_length) breaks ties by row order, so block membership changed -> different padded tensor widths -> different float32 execution -> chains diverged beyond 1e-6 (~2-3/100 events).",
+      "proof": "testR (job 1333591, g0059 gpu:1): rewrote the merged PE into the single-process row order and ran stage-3 only -> output BITWISE IDENTICAL to the baseline archive (0/100 events differ)."
+    },
+    "factor_2_cpu_count": {
+      "mechanism": "gpu:2 jobs default to 16 CPUs; the reference-matching context is the gpu:1 default of 8 CPUs. The stage-3 signature differs between them.",
+      "proof": "testC (job 1333592, g0059 gpu:2 + --cpus-per-task=8): output == the gpu:1-direct signature (byte-identical size 3,880,449 and comparator-equal to single.h5)"
+    },
+    "ruled_out": "CVD visibility (cvdA==cvdB), run.py cache env (envrep==single), node (on590c==on500c==single across g0059/g0050/g0087), stage-3 sharding code path (SJ_RECON_SHARDS=1 default)",
+    "fixes": [
+      "fsmp.py: sharded workers now write ONE parquet per part; the parent merges part files in ascending part order -> exact single-process row order (canonical)",
+      "submit.sh: SJ_CPUS (default 8) forces --cpus-per-task=8 for every submission, restoring the reference-matching CPU context regardless of GPU count"
+    ],
+    "validation_in_flight": {
+      "fixed_candidate_case2": "job 1334083 (SJ_SHARDS=2 SJ_GPUS=2 SJRNG=1 SJ_CPUS=8, g0050) — expect PE/tvE PASS at ~5550s",
+      "baseline_replication_case0": "job 1333810 (all knobs off, gpu:1, g0059) — expect PASS, confirms signature A reproducibility"
+    }
+  },
+  "official_runs_fixed_config": {
+    "config": "SJ_SHARDS=2 SJ_GPUS=2 SUPERJUNO_SJRNG=1 SJ_CPUS=8 (part-order merge), SJ_NODE=g0059,g0050",
+    "case2": {
+      "job": 1334083,
+      "node": "g0050",
+      "stages_s": {
+        "prior": 392.23,
+        "fsmp": 2849.68,
+        "recon": 2316.18
+      },
+      "total_s": 5558.14,
+      "speedup_vs_its_baseline": 1.53,
+      "compare": "PE PASS tvE PASS Final 0",
+      "evidence": [
+        "superjuno-1334083.out",
+        "2-20261020T030856Z-156163.time.csv"
+      ]
+    },
+    "case1": {
+      "job": 1334350,
+      "node": "g0050",
+      "stages_s": {
+        "prior": 372.54,
+        "fsmp": 2896.11,
+        "recon": 2356.09
+      },
+      "total_s": 5624.8,
+      "speedup": 1.53,
+      "compare": "PE PASS tvE PASS Final 0",
+      "timing_csv": "1-20261020T051750Z-327491.time.csv"
+    },
+    "case0": {
+      "job": 1334370,
+      "node": "g0050",
+      "stages_s": {
+        "prior": 372.18,
+        "fsmp": 2909.25,
+        "recon": 2342.68
+      },
+      "total_s": 5624.17,
+      "speedup": 1.48,
+      "compare": "PE PASS tvE PASS Final 0",
+      "timing_csv": "0-20261020T070259Z-450390.time.csv"
+    },
+    "baseline_replication_case0": {
+      "job": 1333810,
+      "node": "g0059",
+      "total_s": 8415.88,
+      "compare": "PE PASS tvE PASS Final 0",
+      "note": "pure upstream gpu:1 context still reproduces the reference — sanity anchor"
+    },
+    "FINAL_RESULT": "ALL THREE SCORED CASES PASS with the optimized config",
+    "case2_speedup": 1.53,
+    "aggregate": "mean speedup 1.51x; stage-2 speedup 1.9-1.98x; all outputs, logs, compare reports and time.csvs remain in place on the cluster at ~/run/superjuno for the same runs"
+  }
+}

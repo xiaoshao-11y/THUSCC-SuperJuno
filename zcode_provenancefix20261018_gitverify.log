@@ -1,0 +1,35 @@
+$ git -C upstream show 82f25ea67f10ede8881f4dd4656ad78cc40cfd5f:src/analysis/fsmp/prepare.py > /tmp/official_prepare.py
+exit: 0
+6931 /tmp/official_prepare.py
+
+$ git -C upstream rev-parse HEAD
+82f25ea67f10ede8881f4dd4656ad78cc40cfd5f
+exit: 0
+
+$ cat upstream_commit.txt
+82f25ea67f10ede8881f4dd4656ad78cc40cfd5f preliminary
+(https://github.com/thu-scc/SuperJUNO, cloned by the supervisor into upstream/)
+
+$ git -C upstream status --porcelain
+ M src/analysis/fsmp/move.py
+ M src/analysis/fsmp/prepare.py
+?? SOURCE.md
+?? src/_sjrng_core.so
+?? src/sjrng.py
+exit: 0
+
+$ git -C upstream diff HEAD --stat
+ src/analysis/fsmp/move.py    | 16 +++++++++++++++-
+ src/analysis/fsmp/prepare.py | 21 +++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 1 deletion(-)
+exit: 0
+
+$ git -C upstream diff HEAD --stat -- scripts/ test/ docs/ pyproject.toml
+exit: 0 (empty diff above = protected paths untouched)
+
+$ ls -la upstream/src/sjrng.py upstream/src/_sjrng_core.so upstream/src/analysis/fsmp/prepare.py upstream/src/analysis/fsmp/move.py
+-rw-r--r-- 1 amazcuter wheel 40432 Oct 17 17:30 upstream/src/_sjrng_core.so
+-rw-r--r-- 1 amazcuter wheel  5270 Oct 16 10:21 upstream/src/analysis/fsmp/move.py
+-rw-r--r-- 1 amazcuter wheel  7856 Oct 16 10:21 upstream/src/analysis/fsmp/prepare.py
+-rw-r--r-- 1 amazcuter wheel  7339 Oct 17 17:30 upstream/src/sjrng.py
+exit: 0

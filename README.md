@@ -1,10 +1,11 @@
 # SuperJUNO 优化交付（SuperJUNO/）
 
 上游流水线（commit `82f25ea`，见 `upstream_commit.txt` 与 `upstream/`）之上的
-**可审查优化候选**：一个逐位等价的 C++17 随机流后端、一个复用上游自带
-CUDA 核的 2×2 求逆替换、一份未接入的融合核设计（草稿，不再扩展），以及带
-防覆盖、防活跃作业误归档与审计记录的 Slurm 提交流程。**所有候选项默认关闭**：
-不改环境变量时运行的是上游原路径。
+**已验证优化交付**：阶段2 双 GPU 位级一致分片（part 序合并保持单进程行序）、
+C++17 随机流后端、CPU 上下文对齐（`SJ_CPUS=8`），以及带防覆盖/活跃检查/审计的
+Slurm 提交流程。**正式测点 0/1/2 已全部通过官方 `--compare`（双 PASS、Final 0，
+2026-10-20，平均加速 1.51×）**；未启用的实验开关（阶段3 分片、SJ_BLOCKS≠10、
+BETA_INV、VRAM 除数）默认关闭并记录了失败原因。
 
 完整依据、公式与源位置、验证状态见 [IMPLEMENTATION.md](IMPLEMENTATION.md)；
 当前进展快照、RTX4090 重验清单与正式验收清单见
@@ -14,12 +15,13 @@ CUDA 核的 2×2 求逆替换、一份未接入的融合核设计（草稿，不
 
 环境入口（2026-10-17 修正）：本题按官网使用**并行科技 RTX4090 集群**——经并行科技
 云桌面 SSH 接入、Slurm sbatch 提交、单节点最多 2 GPU；**不创建独立 RTX4090 云实例**，
-也不使用 SuperShip 的 RTX3090 实例。集群接入现状为 CLUSTER_PENDING（云桌面 SSH
-connection closed、CLI `loginCluster` 拒绝、快传错误码 12213 待客服核查；平台可见绑定
-sczf074 / BSCC-N16R4，是否为比赛指定 4090 资源待确认），资源现状与客服反馈材料见
+也不使用 SuperShip 的 RTX3090 实例。**2026-10-19 集群已开通并完成 `one` 验证**
+（环境/数据就位、位级对照 18/18、基线与 SJRNG 双 PASS，详见
+[IMPLEMENTATION.md](IMPLEMENTATION.md) §12）；账号/分区归属（sczf074 / BSCC-N16R4）
+是否为比赛指定 4090 资源仍待客服或主办方确认，资源现状见
 [../doc/RESOURCE_HANDOFF.md](../doc/RESOURCE_HANDOFF.md) 与
-[../doc/GPU_LOGIN_SUPPORT.md](../doc/GPU_LOGIN_SUPPORT.md)（用户计划 2026-10-18
-自行发送；不代发、不重试登录、不读取密码/证书），详见「集群部署与提交」。
+[../doc/GPU_LOGIN_SUPPORT.md](../doc/GPU_LOGIN_SUPPORT.md)，
+详见「集群部署与提交」。
 
 ## 目录
 
@@ -48,6 +50,8 @@ SuperJUNO/                       # 本层：构建、测试、提交脚本（开
 │   └── test_submit_controlflow.sh  # 本地控制流回归（sbatch/squeue 显式桩）
 └── upstream/              # 官方仓库 + 两处 env-gated 补丁（git diff 可审计）
                            # + 新增 src/sjrng.py、src/_sjrng_core.so（make install）
+                           # （upstream/.git 是指向 official_git_backup/ 的 gitfile，
+                           #  官方历史暂存处，来源与恢复方法见 upstream/SOURCE.md）
                            # —— 部署时这一层的内容拷到 ~/run/superjuno（见下）
 ```
 
@@ -89,23 +93,43 @@ make install     # 将 sjrng.py/_sjrng_core.so 安装到 upstream/src/（幂等�
 
 | 环境变量 | 作用 | 风险级别 |
 |---|---|---|
-| `SUPERJUNO_SJRNG=1` | FSMP 波形随机流改用 C++ 后端（`prepare_random`） | 低（本机已逐位验证；目标环境需重跑对照 + `--compare`） |
-| `SUPERJUNO_BETA_INV=1` | `vmove1` 用上游自带 `beta_inversion` 核替代 `cp.linalg.inv` | 中（非位级等价；必须先过 `--compare`） |
+| `SUPERJUNO_SJRNG=1` | FSMP 波形随机流改用 C++ 后端（`prepare_random`） | 低（正式规模已证逐位一致：case2 PE 全等） |
+| `SUPERJUNO_BETA_INV=1` | `vmove1` 用上游自带 `beta_inversion` 核替代 `cp.linalg.inv` | 中（非位级等价；PE 过 1e-6 但会改变阶段3 输入位型→tvE 链放大风险，正式点未验） |
+| `SJ_BLOCKS=<n>` | 重建分块数（run.py `-n`；官方明示可调，参考值 10） | **实测不可改**：=4 时 tvE FAIL（块重打包改变张量宽度→链发散）；保持 10 |
+| `SUPERJUNO_VRAM_DIV=<d>` | fsmp GPU 批大小=总显存/d（上游 /5） | 实测 /2 严重回归；默认 5 |
+| `SJ_SHARDS=<n>` | **阶段2** parts 轮转分片到 n 个 GPU 进程 + parquet 合并（正式规模已证逐位一致） | 低（需 `SJ_GPUS=n`） |
+| `SJ_RECON_SHARDS=<n>` | **阶段3** 块分片（默认 1=上游单进程） | **实测 tvE FAIL**（cuBLAS float32 选核随执行上下文变化→ulp 漂移→链放大越界；仅留作实验开关，正式运行保持 1） |
 | `SJ_GPUS=1|2`（提交脚本用） | 每作业 GPU 数（规则上限 2） | — |
 
 开关经 sbatch `--export=ALL` 传播，`submit.sh` 把取值记入
 `output/logs/submissions.tsv`；`run.slurm` 在作业日志开头回显。失败路径：
 sjrng 加载/执行异常 → 自动回落上游 numpy 循环并在 stderr 打印原因。
 
-## 集群部署与提交（数据就位后）
+## 集群部署与提交（2026-10-19 已开通；正式点待跑）
 
 **环境入口与登录节点边界**：官网要求本题使用**并行科技 RTX4090 集群**——经并行科技
 云桌面 SSH 接入、Slurm sbatch 提交、单节点最多 2 GPU（`docs/official.txt`；
 2026-10-17 复核快照 `../doc/records/cluster_route_20261017/`）。云桌面 SSH 进入的
-登录节点只用于查询与文件管理（上传/整理文件、`sinfo`/`squeue`、提交与查看作业）：
+登录节点只用于查询与文件管理（上传/整理文件、`sinfo`/`squeue`、提交与查看作业、
+按官方说明安装环境）：
 **`make install` 重编、`cpp/test_sjrng.py` 位级对照与一切数值计算都在 sbatch 分配的
 计算节点上执行**，不经 srun/salloc；提交命令（`submit.sh`/`status.sh`）本身只在
-登录节点发起 sbatch 与查询。接入恢复前以下均为待执行步骤（CLUSTER_PENDING）。
+登录节点发起 sbatch 与查询。
+
+**2026-10-19 已开通并验证（详见 [IMPLEMENTATION.md](IMPLEMENTATION.md) §12）**：
+代码/官方数据/juno 环境全部就位（`~/build/SuperJUNO` 构建层、`~/run/superjuno`
+运行层）；集群重编 `.so` + numpy 2.4.6 位级对照 **18/18**；`one` 基线与
+`SUPERJUNO_SJRNG=1` 均过官方 `--compare`（PE/tvE 双 PASS、Final 0）。诚实结论：
+`one`（单事例小测例）上 SJRNG 无端到端收益，性能取舍待正式点 0/1/2 实测。
+集群实测的两个部署注意项：
+
+- **sbatch 批处理 shell 里 `module` 未初始化**（非登录 shell，实测
+  `module: command not found`）：`run.slurm` 已在首个 `module load` 前 source
+  `/etc/profile.d/modules.sh`（回退 `/usr/share/modules/init/bash`）。
+- **`conda activate` 导出的 `CXXFLAGS/LDFLAGS` 会顶掉 Makefile `?=` 默认值**
+  （丢 `-shared`/`-fPIC`/`-std=c++17`，链接报 `undefined reference to main`）：
+  juno 环境下 `make` 前先 `unset CFLAGS CXXFLAGS LDFLAGS CPPFLAGS`（集群
+  `~/build/SuperJUNO/build_test.slurm` 已内置）。
 
 **先分清两层**：本层 `SuperJUNO/` 是构建/测试层；`upstream/` 的内容（含补丁
 与 `make install` 装入的 `src/sjrng.py`、`src/_sjrng_core.so`）才是运行层，

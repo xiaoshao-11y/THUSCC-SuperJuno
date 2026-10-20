@@ -1,0 +1,34 @@
+Job ID: 1331864, Node: g0053, Start Time: 2026-10-19T13:04:51+08:00
+Repo: /data/home/sczf074/run/superjuno, Case: one
+Alloc: nodes=1 gpus_on_node=1
+Python: 3.11.17
+cupy 14.2.0 CUDA 12040
+numpy 2.4.6 scipy 1.17.1 h5py 3.16.0
+GPU: b'NVIDIA GeForce RTX 4090'
+Opt-in switches: SUPERJUNO_SJRNG=0 SUPERJUNO_BETA_INV=0
+name, memory.total [MiB]
+NVIDIA GeForce RTX 4090, 24564 MiB
+==> [01_fsmp_prior] output/sparsify/one.h5
+==> [02_fsmp] output/PE/one.pq
+==> [03_reconstruct] output/tvE/one.h5
+Completed: output/tvE/one.h5
+TOTAL: 305.510193 s
+Pipeline exit code: 0
+Timing: output/logs/one-20261019T050508Z-1004547.time.csv
+==> [compare_PE] output/PE/one.pq
+
+[PE]
+Reference: data/ana_PE/one.pq
+Candidate: output/PE/one.pq
+0: PASS (atol=1e-06, rtol=1e-06)
+Comparison exit code: 0
+==> [compare_tvE] output/tvE/one.h5
+
+[tvE]
+Reference: data/ana_tvE/one.h5
+Candidate: output/tvE/one.h5
+0: PASS (atol=1e-06, rtol=1e-06)
+Comparison exit code: 0
+
+Final exit code: 0
+End Time: 2026-10-19T13:10:22+08:00, Exit code: 0

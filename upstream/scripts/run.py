@@ -45,7 +45,15 @@ def build_pipeline(input_id):
           "--full-step", "50", "--trials", "4000"]),
         ("03_reconstruct", reconstruction,
          [python, "src/main.py", "-f", pe, "--probe", probe, "--PMT", pmt,
-          "--EMstep", "20", "-n", "10", "-m", "2000", "--bappen", "2",
+          "--EMstep", "20",
+          # [SUPERJUNO-OPT] The task page explicitly allows adjusting the
+          # number of event blocks (reference value 10) provided every
+          # chain's computation and the sampling rules are preserved.
+          # SJ_BLOCKS overrides it; the default "10" keeps the exact
+          # upstream command. The timing/comparison logic of this file is
+          # deliberately untouched.
+          "-n", os.environ.get("SJ_BLOCKS", "10"),
+          "-m", "2000", "--bappen", "2",
           "-o", reconstruction]),
     ]
     return required_files, stages, reconstruction

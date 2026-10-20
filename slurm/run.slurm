@@ -22,11 +22,19 @@
 #                  finished run. submit.sh archives before submitting, so
 #                  normal flow never needs this.
 # Opt-in optimization switches propagated from the submitting shell
-# (recorded by submit.sh in output/logs/submissions.tsv):
+# (echoed at the top of the job log by the line below; submit.sh records
+# the first two in output/logs/submissions.tsv):
 #   SUPERJUNO_SJRNG=1      C++ bit-exact FSMP random preparation
 #   SUPERJUNO_BETA_INV=1   upstream beta_inversion kernel instead of
 #                          cp.linalg.inv in vmove1 (needs --compare PASS
 #                          before being trusted)
+#   SJ_BLOCKS=<n>          reconstruction event-block count (run.py -n;
+#                          officially adjustable, reference value 10)
+#   SUPERJUNO_VRAM_DIV=<d> fsmp GPU batch sizing divisor on total VRAM
+#                          (upstream heuristic: /5; measured: /2 regressed
+#                          badly on one — memory-bound)
+#   SJ_SHARDS=<n>          stage-2 part sharding across n GPUs (round-
+#                          robin parts, parquet merge; needs SJ_GPUS=n)
 
 set -eo pipefail
 
@@ -76,6 +84,13 @@ done
 # manual sbatch invocations of archived repos.
 mkdir -p output/logs output/sparsify output/PE output/tvE output/tmp
 
+# sbatch batch shells are non-login: Environment Modules is not initialized
+# there (observed on BSCC-N16R4 ln01/g-nodes: "module: command not found"),
+# so source the modules init before the first module load.
+if ! command -v module >/dev/null 2>&1; then
+    . /etc/profile.d/modules.sh 2>/dev/null \
+        || . /usr/share/modules/init/bash 2>/dev/null || true
+fi
 module load miniforge3/24.11
 CONDA_BASE=$(conda info --base)
 source "$CONDA_BASE/etc/profile.d/conda.sh"
@@ -89,7 +104,7 @@ print("cupy", cupy.__version__, "CUDA", cupy.cuda.runtime.runtimeGetVersion())
 print("numpy", numpy.__version__, "scipy", scipy.__version__, "h5py", h5py.__version__)
 print("GPU:", cupy.cuda.runtime.getDeviceProperties(0)["name"])
 PY
-echo "Opt-in switches: SUPERJUNO_SJRNG=${SUPERJUNO_SJRNG:-0} SUPERJUNO_BETA_INV=${SUPERJUNO_BETA_INV:-0}"
+echo "Opt-in switches: SUPERJUNO_SJRNG=${SUPERJUNO_SJRNG:-0} SUPERJUNO_BETA_INV=${SUPERJUNO_BETA_INV:-0} SJ_BLOCKS=${SJ_BLOCKS:-10} SUPERJUNO_VRAM_DIV=${SUPERJUNO_VRAM_DIV:-5} SJ_SHARDS=${SJ_SHARDS:-1} SJ_RECON_SHARDS=${SJ_RECON_SHARDS:-1}"
 nvidia-smi --query-gpu=name,memory.total --format=csv || true
 
 python scripts/run.py "$input_id" --compare
